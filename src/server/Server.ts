@@ -15,7 +15,7 @@ async function main() {
   // Check if this is the primary (master) process
   if (cluster.isPrimary) {
     if (config.env() !== GameEnv.Dev) {
-      await setupTunnels();
+// await setupTunnels();
     }
     console.log("Starting master process...");
     await startMaster();
