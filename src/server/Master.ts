@@ -70,11 +70,16 @@ export async function startMaster() {
     );
   }
 
+  // --- FIX START: Hardcode workers to 1 ---
+  const NUM_WORKERS = 1; 
+  // ----------------------------------------
+
   log.info(`Primary ${process.pid} is running`);
-  log.info(`Setting up ${config.numWorkers()} workers...`);
+  log.info(`Setting up ${NUM_WORKERS} workers...`); // Changed from config.numWorkers()
 
   // Fork workers
-  for (let i = 0; i < config.numWorkers(); i++) {
+  // Changed loop condition from config.numWorkers() to NUM_WORKERS
+  for (let i = 0; i < NUM_WORKERS; i++) {
     const worker = cluster.fork({
       WORKER_ID: i,
     });
@@ -86,11 +91,15 @@ export async function startMaster() {
     if (message.type === "WORKER_READY") {
       const workerId = message.workerId;
       readyWorkers.add(workerId);
+      
+      // Changed logging to use NUM_WORKERS
       log.info(
-        `Worker ${workerId} is ready. (${readyWorkers.size}/${config.numWorkers()} ready)`,
+        `Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`,
       );
+
       // Start scheduling when all workers are ready
-      if (readyWorkers.size === config.numWorkers()) {
+      // CRITICAL CHANGE: Changed from config.numWorkers() to NUM_WORKERS
+      if (readyWorkers.size === NUM_WORKERS) {
         log.info("All workers ready, starting game scheduling");
 
         const scheduleLobbies = () => {
