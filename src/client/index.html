@@ -53,7 +53,6 @@
 
       .bg-image {
         content: "";
-        /* Update this to a picture of a campus map later */
         background-image: url("/images/EuropeBackgroundBlurred.webp");
         background-position: center;
         background-attachment: fixed;
@@ -71,7 +70,6 @@
         position: absolute;
         width: 100%;
         height: 100vh;
-        /* Adds a college-themed overlay tint */
         background: rgba(30, 58, 138, 0.2); 
       }
 
@@ -83,7 +81,6 @@
         display: none;
       }
       
-      /* College Wars Logo Style */
       .college-logo {
         font-family: 'Arial Black', sans-serif;
         font-size: 3rem;
@@ -154,147 +151,18 @@
     <main class="flex justify-center flex-grow">
       <div class="container pt-12">
         <div id="auth-box" class="w-[25%] p-4 bg-gray-800/90 backdrop-blur-md rounded-lg border border-blue-500/30 text-white mb-4 shadow-lg">
-    <h3 class="font-bold mb-3 text-blue-400 text-lg">Student ID (Account)</h3>
-    <input id="login-email" type="email" placeholder="Email" class="w-full mb-2 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
-    <input id="login-pass" type="password" placeholder="Password" class="w-full mb-3 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
-    
-    <div class="flex gap-2">
-        <button onclick="login()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Login</button>
-        <button onclick="register()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">Enrol</button>
-    </div>
-    <div id="auth-status" class="mt-2 text-sm text-yellow-400 font-mono min-h-[20px]"></div>
-</div>
-
-<script>
-// Account Logic
-async function register() {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-pass').value;
-    
-    if(!email || !pass) {
-        document.getElementById('auth-status').innerText = "Please enter email & password.";
-        return;
-    }
-
-    const username = prompt("Enter your Student Name (Username):");
-    if(!username) return;
-
-    document.getElementById('auth-status').innerText = "Enrolling...";
-
-    try {
-        const res = await fetch('/api/register', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username, email, password: pass })
-        });
-        const data = await res.json();
-        
-        if(data.success) {
-            document.getElementById('auth-status').innerText = "Success! Please Login.";
-            document.getElementById('auth-status').className = "mt-2 text-sm text-green-400 font-mono";
-        } else {
-            document.getElementById('auth-status').innerText = "Error: " + data.error;
-            document.getElementById('auth-status').className = "mt-2 text-sm text-red-400 font-mono";
-        }
-    } catch(e) {
-        document.getElementById('auth-status').innerText = "Connection Error";
-    }
-}
-
-async function login() {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-pass').value;
-
-    if(!email || !pass) return;
-
-    document.getElementById('auth-status').innerText = "Verifying...";
-
-    try {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ email, password: pass })
-        });
-        const data = await res.json();
-        
-        if(data.success) {
-            const statusDiv = document.getElementById('auth-status');
-            statusDiv.innerHTML = `Welcome, <span class="text-blue-300">${data.user.username}</span>!<br>Wins: <span class="text-green-400">${data.user.wins}</span>`;
-            statusDiv.className = "mt-2 text-sm text-white font-mono";
+            <h3 class="font-bold mb-3 text-blue-400 text-lg">Student ID (Account)</h3>
+            <input id="login-email" type="email" placeholder="Email" class="w-full mb-2 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
+            <input id="login-pass" type="password" placeholder="Password" class="w-full mb-3 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
             
-            // Save token
-            localStorage.setItem('cw_token', data.token);
-            
-            // Hide inputs to clean up UI
-            document.getElementById('login-email').style.display = 'none';
-            document.getElementById('login-pass').style.display = 'none';
-        } else {
-            document.getElementById('auth-status').innerText = "Failed: " + data.error;
-            document.getElementById('auth-status').className = "mt-2 text-sm text-red-400 font-mono";
-        }
-    } catch(e) {
-        document.getElementById('auth-status').innerText = "Connection Error";
-    }
-}
-</script>
-
-        <div class="container__row">
-          <flag-input class="w-[20%] md:w-[20%]"></flag-input>
-          <territory-patterns-modal class="w-[20%] md:w-[15%]">
-            <button
-              id="territory-patterns-input-preview-button"
-              class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center"
-              title="Pick your school colors!"
-            ></button>
-          </territory-patterns-modal>
-          <username-input class="relative w-full"></username-input>
-          <news-button class="w-[20%] component-hideable"></news-button>
-        </div>
-        <div></div>
-        <div>
-          <public-lobby class="block"></public-lobby>
-        </div>
-        <div>
-          <matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button>
-        </div>
-        <div class="container__row container__row--equal">
-          <o-button
-            id="host-lobby-button"
-            title="Create Dorm Lobby"
-            translationKey="main.create_lobby"
-            block
-            secondary
-          ></o-button>
-          <o-button
-            id="join-private-lobby-button"
-            title="Join Class"
-            translationKey="main.join_lobby"
-            block
-            secondary
-          ></o-button>
+            <div class="flex gap-2">
+                <button onclick="login()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Login</button>
+                <button onclick="register()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">Enrol</button>
+            </div>
+            <div id="auth-status" class="mt-2 text-sm text-yellow-400 font-mono min-h-[20px]"></div>
         </div>
 
-        <o-button
-          id="single-player"
-          title="Solo Study Mode"
-          translationKey="main.single_player"
-          block
-        ></o-button>
-
-        <o-button
-          id="help-button"
-          title="Syllabus (Instructions)"
-          translationKey="main.instructions"
-          block
-          secondary
-        ></o-button>
-        <div class="container__row">
-          <lang-selector class="w-full"></lang-selector>
-        </div>
-      </div>
-    </main>
-
-    <button
-      id="settings-button"
-      title="Settings"
-      class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-
+        <script>
+        // Account Logic
+        async function register() {
+            const email = document.getElementById('login-email').value;
