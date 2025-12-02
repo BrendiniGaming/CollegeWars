@@ -61,7 +61,6 @@ app.use(
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- CRITICAL EXPORT START ---
 export async function startMaster() {
   if (!cluster.isPrimary) {
     throw new Error(
@@ -132,12 +131,15 @@ export async function startMaster() {
     );
   });
 
-  const PORT = 3000;
-  server.listen(PORT, () => {
-    log.info(`Master HTTP server listening on port ${PORT}`);
+  // --- FIX #3: BIND TO 0.0.0.0 AND USE ENV PORT ---
+  // This is the part that was missing!
+  const PORT = parseInt(process.env.PORT || "3000");
+  const HOST = "0.0.0.0"; 
+
+  server.listen(PORT, HOST, () => {
+    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
   });
 }
-// --- CRITICAL EXPORT END ---
 
 app.get("/api/env", async (req, res) => {
   const envConfig = {
@@ -231,31 +233,4 @@ async function fetchLobbies(): Promise<number> {
   return publicLobbyIDs.size;
 }
 
-async function schedulePublicGame(playlist: MapPlaylist) {
-  const gameID = generateID();
-  publicLobbyIDs.add(gameID);
-  const workerPath = config.workerPath(gameID);
-  try {
-    const response = await fetch(
-      `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [config.adminHeader()]: config.adminToken(),
-        },
-        body: JSON.stringify(playlist.gameConfig()),
-      },
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to schedule public game: ${response.statusText}`);
-    }
-  } catch (error) {
-    log.error(`Failed to schedule public game on worker ${workerPath}:`, error);
-    throw error;
-  }
-}
-
-app.get("*", function (req, res) {
-  res.sendFile(path.join(__dirname, "../../static/index.html"));
-});
+async function schedulePublicGame(playlist
