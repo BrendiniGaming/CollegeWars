@@ -42,15 +42,24 @@
 
     <main class="flex justify-center flex-grow">
       <div class="container pt-12">
-        <div id="auth-box" class="w-[25%] p-4 bg-gray-800/90 backdrop-blur-md rounded-lg border border-blue-500/30 text-white mb-4 shadow-lg">
-            <h3 class="font-bold mb-3 text-blue-400 text-lg">Student ID (Account)</h3>
-            <input id="login-email" type="email" placeholder="Email" class="w-full mb-2 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
-            <input id="login-pass" type="password" placeholder="Password" class="w-full mb-3 p-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-white transition-colors" />
-            <div class="flex gap-2">
-                <button onclick="login()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">Login</button>
-                <button onclick="register()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors">Enrol</button>
+        <div id="auth-box" class="w-full max-w-md mx-auto p-6 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-blue-500/50 shadow-2xl mb-8 relative z-10">
+            <div class="text-center mb-6">
+                <h3 class="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">STUDENT PORTAL</h3>
+                <p class="text-blue-200/60 text-xs uppercase tracking-widest mt-1">Secure University Access</p>
             </div>
-            <div id="auth-status" class="mt-2 text-sm text-yellow-400 font-mono min-h-[20px]"></div>
+            <div class="space-y-4">
+                <div class="group">
+                    <input id="login-email" type="email" placeholder="Student Email" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all" />
+                </div>
+                <div class="group">
+                    <input id="login-pass" type="password" placeholder="Password" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all" />
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="login()" class="flex-1 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all">LOGIN</button>
+                    <button onclick="register()" class="flex-1 bg-gradient-to-br from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-green-900/20 transition-all">ENROL</button>
+                </div>
+            </div>
+            <div id="auth-status" class="mt-4 text-center text-sm font-medium min-h-[20px] text-blue-300/80"></div>
         </div>
 
         <script>
@@ -73,9 +82,10 @@
                 const data = await res.json();
                 if(data.success) {
                     document.getElementById('auth-status').innerText = "Success! Please Login.";
-                    document.getElementById('auth-status').className = "mt-2 text-sm text-green-400 font-mono";
+                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-green-400";
                 } else {
                     document.getElementById('auth-status').innerText = "Error: " + data.error;
+                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-red-400";
                 }
             } catch(e) {
                 document.getElementById('auth-status').innerText = "Connection Error";
@@ -102,6 +112,7 @@
                     document.getElementById('login-pass').style.display = 'none';
                 } else {
                     document.getElementById('auth-status').innerText = "Failed: " + data.error;
+                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-red-400";
                 }
             } catch(e) {
                 document.getElementById('auth-status').innerText = "Connection Error";
@@ -161,15 +172,4 @@
     <user-setting></user-setting>
     <multi-tab-modal></multi-tab-modal>
     <game-left-sidebar></game-left-sidebar>
-    <flag-input-modal></flag-input-modal>
-    <performance-overlay></performance-overlay>
-
-    <script>
-      window.addEventListener("load", function () {
-        requestAnimationFrame(() => {
-          document.documentElement.classList.remove("preload");
-        });
-      });
-    </script>
-  </body>
-</html>
+    <flag-input-modal></
