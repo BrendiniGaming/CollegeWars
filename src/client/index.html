@@ -1,175 +1,52 @@
 <!doctype html>
 <html lang="en" class="h-full" translate="no">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>College Wars</title>
-    <link rel="manifest" href="../../resources/manifest.json" />
-    <link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg" />
-    <link rel="canonical" href="https://collegewars.io/" />
-    <style>
-      .preload * { transition: none !important; }
-      html { visibility: visible; opacity: 1; }
-      html.preload { visibility: hidden; opacity: 0; }
-      .bg-image {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-        background-image: url("/images/EuropeBackgroundBlurred.webp");
-        background-size: cover;
-      }
-      .bg-image::before {
-        content: ""; position: absolute; width: 100%; height: 100vh;
-        background: rgba(30, 58, 138, 0.2); 
-      }
-      .college-logo {
-        font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900;
-        text-transform: uppercase;
-        background: linear-gradient(to bottom, #FFD700, #DAA520);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5));
-      }
-    </style>
-    <script>document.documentElement.className = "preload";</script>
-  </head>
-
-  <body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
-    <header class="l-header">
-      <div class="l-header__content flex flex-col items-center justify-center">
-        <h1 class="college-logo">COLLEGE WARS</h1>
-        <div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div>
-      </div>
-    </header>
-    <div class="bg-image"></div>
-
-    <main class="flex justify-center flex-grow">
-      <div class="container pt-12">
-        <div id="auth-box" class="w-full max-w-md mx-auto p-6 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-blue-500/50 shadow-2xl mb-8 relative z-10">
-            <div class="text-center mb-6">
-                <h3 class="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">STUDENT PORTAL</h3>
-                <p class="text-blue-200/60 text-xs uppercase tracking-widest mt-1">Secure University Access</p>
-            </div>
-            <div class="space-y-4">
-                <div class="group">
-                    <input id="login-email" type="email" placeholder="Student Email" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all" />
-                </div>
-                <div class="group">
-                    <input id="login-pass" type="password" placeholder="Password" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all" />
-                </div>
-                <div class="flex gap-3 pt-2">
-                    <button onclick="login()" class="flex-1 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all">LOGIN</button>
-                    <button onclick="register()" class="flex-1 bg-gradient-to-br from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-green-900/20 transition-all">ENROL</button>
-                </div>
-            </div>
-            <div id="auth-status" class="mt-4 text-center text-sm font-medium min-h-[20px] text-blue-300/80"></div>
-        </div>
-
-        <script>
-        async function register() {
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-pass').value;
-            if(!email || !pass) {
-                document.getElementById('auth-status').innerText = "Please enter email & password.";
-                return;
-            }
-            const username = prompt("Enter your Student Name (Username):");
-            if(!username) return;
-            document.getElementById('auth-status').innerText = "Enrolling...";
-            try {
-                const res = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username, email, password: pass })
-                });
-                const data = await res.json();
-                if(data.success) {
-                    document.getElementById('auth-status').innerText = "Success! Please Login.";
-                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-green-400";
-                } else {
-                    document.getElementById('auth-status').innerText = "Error: " + data.error;
-                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-red-400";
-                }
-            } catch(e) {
-                document.getElementById('auth-status').innerText = "Connection Error";
-            }
-        }
-
-        async function login() {
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-pass').value;
-            if(!email || !pass) return;
-            document.getElementById('auth-status').innerText = "Verifying...";
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email, password: pass })
-                });
-                const data = await res.json();
-                if(data.success) {
-                    const statusDiv = document.getElementById('auth-status');
-                    statusDiv.innerHTML = `Welcome, <span class="text-blue-300">${data.user.username}</span>!<br>Wins: <span class="text-green-400">${data.user.wins}</span>`;
-                    localStorage.setItem('cw_token', data.token);
-                    document.getElementById('login-email').style.display = 'none';
-                    document.getElementById('login-pass').style.display = 'none';
-                } else {
-                    document.getElementById('auth-status').innerText = "Failed: " + data.error;
-                    document.getElementById('auth-status').className = "mt-4 text-center text-sm font-medium text-red-400";
-                }
-            } catch(e) {
-                document.getElementById('auth-status').innerText = "Connection Error";
-            }
-        }
-        </script>
-
-        <div class="container__row">
-          <flag-input class="w-[20%] md:w-[20%]"></flag-input>
-          <username-input class="relative w-full"></username-input>
-        </div>
-        <div><public-lobby class="block"></public-lobby></div>
-        <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
-        <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
-        <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
-        <o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button>
-        <o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
-        <div class="container__row"><lang-selector class="w-full"></lang-selector></div>
-      </div>
-    </main>
-
-    <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div>
-    <div id="app"></div>
-    <div id="radialMenu" class="radial-menu"></div>
-    <div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div>
-    <div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
-    <div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position: fixed; pointer-events: none">
-      <div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events: none">
-        <chat-display></chat-display>
-        <events-display></events-display>
-      </div>
-      <div style="pointer-events: auto"><control-panel></control-panel></div>
-    </div>
-
-    <account-button></account-button>
-    <single-player-modal></single-player-modal>
-    <host-lobby-modal></host-lobby-modal>
-    <join-private-lobby-modal></join-private-lobby-modal>
-    <emoji-table></emoji-table>
-    <build-menu></build-menu>
-    <win-modal></win-modal>
-    <game-starting-modal></game-starting-modal>
-    <game-top-bar></game-top-bar>
-    <unit-display></unit-display>
-    <div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2">
-      <replay-panel></replay-panel>
-      <game-right-sidebar></game-right-sidebar>
-    </div>
-    <settings-modal></settings-modal>
-    <player-panel></player-panel>
-    <spawn-timer></spawn-timer>
-    <help-modal></help-modal>
-    <dark-mode-button></dark-mode-button>
-    <stats-button></stats-button>
-    <alert-frame></alert-frame>
-    <chat-modal></chat-modal>
-    <user-setting></user-setting>
-    <multi-tab-modal></multi-tab-modal>
-    <game-left-sidebar></game-left-sidebar>
-    <flag-input-modal></
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>College Wars</title>
+<link rel="manifest" href="../../resources/manifest.json" />
+<link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg" />
+<link rel="canonical" href="https://collegewars.io/" />
+<style>
+.preload *{transition:none !important}html{visibility:visible;opacity:1}html.preload{visibility:hidden;opacity:0}
+.bg-image{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background-image:url("/images/EuropeBackgroundBlurred.webp");background-size:cover}
+.bg-image::before{content:"";position:absolute;width:100%;height:100vh;background:rgba(30,58,138,0.2)}
+.college-logo{font-family:'Arial Black',sans-serif;font-size:3rem;font-weight:900;text-transform:uppercase;background:linear-gradient(to bottom,#FFD700,#DAA520);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(2px 4px 6px rgba(0,0,0,0.5))}
+</style>
+<script>document.documentElement.className="preload";</script>
+<script async src="https://cdn.fuseplatform.net/publift/tags/2/4121/fuse.js"></script>
+<script>window.googletag=window.googletag||{cmd:[]};googletag.cmd.push(function(){googletag.pubads().set("page_url","http://collegewars.io");});</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-16702609763"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","AW-16702609763");</script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-WQGQQ8RDN4"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-WQGQQ8RDN4");</script>
+</head>
+<body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
+<header class="l-header"><div class="l-header__content flex flex-col items-center justify-center"><h1 class="college-logo">COLLEGE WARS</h1><div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div></div></header>
+<div class="bg-image"></div>
+<gutter-ads></gutter-ads>
+<main class="flex justify-center flex-grow">
+<div class="container pt-12">
+<div id="auth-box" class="w-full max-w-md mx-auto p-6 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-blue-500/50 shadow-2xl mb-8 relative z-10">
+<div class="text-center mb-6"><h3 class="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">STUDENT PORTAL</h3><p class="text-blue-200/60 text-xs uppercase tracking-widest mt-1">Secure University Access</p></div>
+<div class="space-y-4">
+<div class="group"><input id="login-email" type="email" placeholder="Student Email" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all"/></div>
+<div class="group"><input id="login-pass" type="password" placeholder="Password" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all"/></div>
+<div class="flex gap-3 pt-2">
+<button onclick="login()" class="flex-1 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide">LOGIN</button>
+<button onclick="register()" class="flex-1 bg-gradient-to-br from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide">ENROL</button>
+</div></div>
+<div id="auth-status" class="mt-4 text-center text-sm font-medium min-h-[20px] text-blue-300/80"></div>
+</div>
+<script>
+async function register(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t){document.getElementById("auth-status").innerText="Enter email & password";return}const n=prompt("Enter Student Name:");if(!n)return;document.getElementById("auth-status").innerText="Enrolling...";try{const a=await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:n,email:e,password:t})}),s=await a.json();s.success?(document.getElementById("auth-status").innerText="Success! Please Login.",document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-green-400"):(document.getElementById("auth-status").innerText="Error: "+s.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(r){document.getElementById("auth-status").innerText="Connection Error"}}
+async function login(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t)return;document.getElementById("auth-status").innerText="Verifying...";try{const n=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:t})}),a=await n.json();a.success?(document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Wins: <span class="text-green-400">${a.user.wins}</span>`,localStorage.setItem("cw_token",a.token),document.getElementById("login-email").style.display="none",document.getElementById("login-pass").style.display="none"):(document.getElementById("auth-status").innerText="Failed: "+a.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(s){document.getElementById("auth-status").innerText="Connection Error"}}
+</script>
+<div class="container__row"><flag-input class="w-[20%] md:w-[20%]"></flag-input><territory-patterns-modal class="w-[20%] md:w-[15%]"><button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center" title="Pick patterns"></button></territory-patterns-modal><username-input class="relative w-full"></username-input><news-button class="w-[20%] component-hideable"></news-button></div>
+<div></div><div><public-lobby class="block"></public-lobby></div><div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
+<div class="container__row container__row--equal"><o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button><o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button></div>
+<o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button><o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
+<div class="container__row"><lang-selector class="w-full"></lang-selector></div></div></main>
+<button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
+<div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div><div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
+<div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px
