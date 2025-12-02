@@ -17,9 +17,10 @@ const config = getServerConfigFromServer();
 // @ts-ignore
 config.numWorkers = () => 1;
 
+// --- ROBUST DATABASE CONNECTION ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 const JWT_SECRET = "CollegeWarsSecretKey123";
 
