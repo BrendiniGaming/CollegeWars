@@ -10,10 +10,49 @@ import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 
-// 👇 Add your DB import here
-import { db } from "./DB"; // adjust path if needed
+// Database connection
+import { db } from "./DB";
 
 const config = getServerConfigFromServer();
+
+// --- Rank System Definitions ---
+const TIER_ORDER = [
+  "UNRANKED",
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+  "CHAMPION",
+  "GRAND_CHAMPION",
+  "HEROIC_CHAMPION",
+  "MASTER_CHAMPION",
+  "MASTERS",
+];
+
+const RANK_THRESHOLDS: Record<string, number> = {
+  UNRANKED: 0,
+  BRONZE: 1000,
+  SILVER: 2500,
+  GOLD: 5000,
+  PLATINUM: 8000,
+  CHAMPION: 12000,
+  GRAND_CHAMPION: 18000,
+  HEROIC_CHAMPION: 25000,
+  MASTER_CHAMPION: 35000,
+  MASTERS: 50000,
+};
+
+function getRankTier(xp: number): string {
+  let currentTier = "UNRANKED";
+  for (const tier of TIER_ORDER) {
+    if (xp >= RANK_THRESHOLDS[tier]) {
+      currentTier = tier;
+    } else {
+      break;
+    }
+  }
+  return currentTier;
+}
 
 // --- CRITICAL FIX: Worker Limit (Prevents 502/Memory Crash) ---
 // @ts-ignore
@@ -50,17 +89,15 @@ app.use(
     },
   }),
 );
-app.use(express.json());
 app.set("trust proxy", 3);
 app.use(rateLimit({ windowMs: 1000, max: 20 }));
 
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- NEW: Database Init Function ---
-async function initDB() {
+// --- Database Init Function ---
+async function initDB(): Promise<void> {
   try {
-    // 1. Ensure the base users table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -73,7 +110,6 @@ async function initDB() {
       );
     `);
 
-    // 2. Add rank columns if missing
     await db.query(`
       DO $$ 
       BEGIN
@@ -100,8 +136,87 @@ async function initDB() {
 }
 
 // --- Helper Functions ---
-async function schedulePublicGame(playlist: MapPlaylist) { /* unchanged */ }
-async function fetchLobbies(): Promise<number> { /* unchanged */ }
+async function schedulePublicGame(playlist: MapPlaylist) {
+  const gameID = generateID();
+  publicLobbyIDs.add(gameID);
+  const workerPath = config.workerPath(gameID);
+  try {
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [config.adminHeader()]: config.adminToken(),
+        },
+        body: JSON.stringify(playlist.gameConfig()),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to schedule public game: ${response.statusText}`);
+    }
+  } catch (error) {
+    log.error(`Failed to schedule public game on worker ${workerPath}:`, error);
+    throw error;
+  }
+}
+
+async function fetchLobbies(): Promise<number> {
+  const fetchPromises: Promise<GameInfo | null>[] = [];
+  for (const gameID of new Set(publicLobbyIDs)) {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 5000);
+    const port = config.workerPort(gameID);
+    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
+      headers: { [config.adminHeader()]: config.adminToken() },
+      signal: controller.signal,
+    })
+      .then((resp) => resp.json())
+      .then((json) => {
+        return json as GameInfo;
+      })
+      .catch((error) => {
+        log.error(`Error fetching game ${gameID}:`, error);
+        publicLobbyIDs.delete(gameID);
+        return null;
+      });
+    fetchPromises.push(promise);
+  }
+  const results = await Promise.all(fetchPromises);
+  const lobbyInfos: GameInfo[] = results
+    .filter((result) => result !== null)
+    .map((gi: GameInfo) => {
+      return {
+        gameID: gi.gameID,
+        numClients: gi?.clients?.length ?? 0,
+        gameConfig: gi.gameConfig,
+        msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
+      } as GameInfo;
+    });
+
+  lobbyInfos.forEach((l) => {
+    if ("msUntilStart" in l && l.msUntilStart !== undefined && l.msUntilStart <= 250) {
+      publicLobbyIDs.delete(l.gameID);
+      return;
+    }
+    if (
+      "gameConfig" in l &&
+      l.gameConfig !== undefined &&
+      "maxPlayers" in l.gameConfig &&
+      l.gameConfig.maxPlayers !== undefined &&
+      "numClients" in l &&
+      l.numClients !== undefined &&
+      l.gameConfig.maxPlayers <= l.numClients
+    ) {
+      publicLobbyIDs.delete(l.gameID);
+      return;
+    }
+  });
+
+  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
+  return publicLobbyIDs.size;
+}
 
 // --- MAIN START FUNCTION ---
 export async function startMaster() {
@@ -109,7 +224,6 @@ export async function startMaster() {
     throw new Error("startMaster() should only be called in the primary process");
   }
 
-  // 👇 Call DB init before starting workers
   await initDB();
 
   const NUM_WORKERS = 1;
@@ -121,7 +235,32 @@ export async function startMaster() {
     log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
   }
 
-  // cluster.on(...) etc. unchanged
+  cluster.on("message", (worker, message) => {
+    if (message.type === "WORKER_READY") {
+      const workerId = message.workerId;
+      readyWorkers.add(workerId);
+      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
+
+      if (readyWorkers.size === NUM_WORKERS) {
+        log.info("All workers ready, starting game scheduling");
+        const scheduleLobbies = () => {
+          schedulePublicGame(playlist).catch((error) => {
+            log.error("Error scheduling public game:", error);
+          });
+        };
+        setInterval(() => {
+          fetchLobbies().then((lobbies) => {
+            if (lobbies === 0) scheduleLobbies();
+          });
+        }, 100);
+      }
+    }
+  });
+
+  cluster.on("exit", (worker, code, signal) => {
+    const workerId = (worker as any).process?.env?.WORKER_ID;
+    if (workerId) cluster.fork({ WORKER_ID: workerId });
+  });
 
   const PORT = parseInt(process.env.PORT || "3000");
   const HOST = "0.0.0.0";
@@ -130,5 +269,5 @@ export async function startMaster() {
   });
 }
 
-// --- Routes --- (unchanged)
-
+// --- Routes ---
+app.get
