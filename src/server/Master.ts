@@ -54,7 +54,7 @@ app.use(rateLimit({ windowMs: 1000, max: 20 }));
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- Helper Functions (Defined before usage) ---
+// --- Helper Functions (Defined FIRST to prevent errors) ---
 
 async function schedulePublicGame(playlist: MapPlaylist) {
   const gameID = generateID();
