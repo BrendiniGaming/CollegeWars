@@ -1,232 +1,71 @@
-import cluster from "cluster";
-import express from "express";
-import rateLimit from "express-rate-limit";
-import http from "http";
-import path from "path";
-import { fileURLToPath } from "url";
-import { getServerConfigFromServer } from "../core/configuration/ConfigLoader";
-import { GameInfo, ID } from "../core/Schemas";
-import { generateID } from "../core/Util";
-import { logger } from "./Logger";
-import { MapPlaylist } from "./MapPlaylist";
+<!DOCTYPE html>
+<html lang="en" class="h-full" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>College Wars</title>
+    <link rel="manifest" href="../../resources/manifest.json">
+    <link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg">
+    <link rel="canonical" href="https://collegewars.io/">
+    <style>
+        .preload * { transition: none !important; }
+        html { visibility: visible; opacity: 1; }
+        html.preload { visibility: hidden; opacity: 0; }
+        .bg-image { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-image: url("/images/EuropeBackgroundBlurred.webp"); background-size: cover; }
+        .bg-image::before { content: ""; position: absolute; width: 100%; height: 100vh; background: rgba(30, 58, 138, 0.2); }
+        .college-logo { font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900; text-transform: uppercase; background: linear-gradient(to bottom, #FFD700, #DAA520); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5)); }
+    </style>
+    <script>document.documentElement.className = "preload";</script>
+</head>
+<body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
+    <header class="l-header">
+        <div class="l-header__content flex flex-col items-center justify-center">
+            <h1 class="college-logo">COLLEGE WARS</h1>
+            <div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div>
+        </div>
+    </header>
+    <div class="bg-image"></div>
 
-const config = getServerConfigFromServer();
+    <main class="flex justify-center flex-grow">
+        <div class="container pt-12">
+            <div class="container__row">
+                <flag-input class="w-[20%] md:w-[20%]"></flag-input>
+                <territory-patterns-modal class="w-[20%] md:w-[15%]">
+                    <button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center"></button>
+                </territory-patterns-modal>
+                <username-input class="relative w-full"></username-input>
+                <news-button class="w-[20%] component-hideable"></news-button>
+            </div>
+            <div><public-lobby class="block"></public-lobby></div>
+            <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
+            <div class="container__row container__row--equal">
+                <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
+                <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
+            </div>
+            <o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button>
+            <o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
+            <div class="container__row"><lang-selector class="w-full"></lang-selector></div>
+        </div>
+    </main>
 
-// --- CRITICAL FIX: Worker Limit (Prevents 502/Memory Crash) ---
-// This tells the game engine: "Stop looking for workers 1-20. Only Worker 0 exists."
-// @ts-ignore
-config.numWorkers = () => 1;
-// ---------------------------------------------------------------
+    <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
+    <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div>
+    <div id="app"></div>
+    <div id="radialMenu" class="radial-menu"></div>
+    <div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div>
+    <div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
+    <div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none">
+        <div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none">
+            <chat-display></chat-display>
+            <events-display></events-display>
+        </div>
+        <div style="pointer-events:auto"><control-panel></control-panel></div>
+    </div>
 
-const playlist = new MapPlaylist();
-const readyWorkers = new Set();
-
-const app = express();
-const server = http.createServer(app);
-
-const log = logger.child({ comp: "m" });
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// --- Middleware ---
-app.use(express.json());
-app.use(
-  express.static(path.join(__dirname, "../../static"), {
-    maxAge: "1y",
-    setHeaders: (res, path) => {
-      if (path.endsWith(".html")) {
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
-        res.setHeader("ETag", "");
-      } else if (path.match(/\.(js|css|svg)$/)) {
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      } else if (path.match(/\.(bin|dat|exe|dll|so|dylib)$/)) {
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      }
-    },
-  }),
-);
-app.use(express.json());
-app.set("trust proxy", 3);
-app.use(rateLimit({ windowMs: 1000, max: 20 }));
-
-let publicLobbiesJsonStr = "";
-const publicLobbyIDs: Set<string> = new Set();
-
-// --- Helper Functions ---
-
-async function schedulePublicGame(playlist: MapPlaylist) {
-  const gameID = generateID();
-  publicLobbyIDs.add(gameID);
-  const workerPath = config.workerPath(gameID);
-  try {
-    const response = await fetch(
-      `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [config.adminHeader()]: config.adminToken(),
-        },
-        body: JSON.stringify(playlist.gameConfig()),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to schedule public game: ${response.statusText}`);
-    }
-  } catch (error) {
-    log.error(`Failed to schedule public game on worker ${workerPath}:`, error);
-    throw error;
-  }
-}
-
-async function fetchLobbies(): Promise<number> {
-  const fetchPromises: Promise<GameInfo | null>[] = [];
-  for (const gameID of new Set(publicLobbyIDs)) {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000);
-    const port = config.workerPort(gameID);
-    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
-      headers: { [config.adminHeader()]: config.adminToken() },
-      signal: controller.signal,
-    })
-      .then((resp) => resp.json())
-      .then((json) => {
-        return json as GameInfo;
-      })
-      .catch((error) => {
-        log.error(`Error fetching game ${gameID}:`, error);
-        publicLobbyIDs.delete(gameID);
-        return null;
-      });
-    fetchPromises.push(promise);
-  }
-  const results = await Promise.all(fetchPromises);
-  const lobbyInfos: GameInfo[] = results
-    .filter((result) => result !== null)
-    .map((gi: GameInfo) => {
-      return {
-        gameID: gi.gameID,
-        numClients: gi?.clients?.length ?? 0,
-        gameConfig: gi.gameConfig,
-        msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
-      } as GameInfo;
-    });
-
-  lobbyInfos.forEach((l) => {
-    if ("msUntilStart" in l && l.msUntilStart !== undefined && l.msUntilStart <= 250) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-    if (
-      "gameConfig" in l &&
-      l.gameConfig !== undefined &&
-      "maxPlayers" in l.gameConfig &&
-      l.gameConfig.maxPlayers !== undefined &&
-      "numClients" in l &&
-      l.numClients !== undefined &&
-      l.gameConfig.maxPlayers <= l.numClients
-    ) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-  });
-
-  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
-  return publicLobbyIDs.size;
-}
-
-// --- MAIN START FUNCTION ---
-
-export async function startMaster() {
-  if (!cluster.isPrimary) {
-    throw new Error("startMaster() should only be called in the primary process");
-  }
-
-  // --- CRASH FIX: Hardcode Workers to 1 ---
-  const NUM_WORKERS = 1;
-
-  log.info(`Primary ${process.pid} is running`);
-  log.info(`Setting up ${NUM_WORKERS} workers...`);
-
-  for (let i = 0; i < NUM_WORKERS; i++) {
-    const worker = cluster.fork({ WORKER_ID: i });
-    log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
-  }
-
-  cluster.on("message", (worker, message) => {
-    if (message.type === "WORKER_READY") {
-      const workerId = message.workerId;
-      readyWorkers.add(workerId);
-      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
-
-      if (readyWorkers.size === NUM_WORKERS) {
-        log.info("All workers ready, starting game scheduling");
-        const scheduleLobbies = () => {
-          schedulePublicGame(playlist).catch((error) => {
-            log.error("Error scheduling public game:", error);
-          });
-        };
-        setInterval(() => {
-          fetchLobbies().then((lobbies) => {
-            if (lobbies === 0) scheduleLobbies();
-          });
-        }, 100);
-      }
-    }
-  });
-
-  cluster.on("exit", (worker, code, signal) => {
-    const workerId = (worker as any).process?.env?.WORKER_ID;
-    if (workerId) cluster.fork({ WORKER_ID: workerId });
-  });
-
-  const PORT = parseInt(process.env.PORT || "3000");
-  const HOST = "0.0.0.0";
-  server.listen(PORT, HOST, () => {
-    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
-  });
-}
-
-// --- Routes ---
-
-app.get("/api/env", async (req, res) => {
-  const envConfig = { game_env: process.env.GAME_ENV };
-  if (!envConfig.game_env) return res.sendStatus(500);
-  res.json(envConfig);
-});
-
-app.get("/api/public_lobbies", async (req, res) => {
-  res.send(publicLobbiesJsonStr);
-});
-
-app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
-  if (req.headers[config.adminHeader()] !== config.adminToken()) {
-    return res.status(401).send("Unauthorized");
-  }
-  const { gameID, clientID } = req.params;
-  if (!ID.safeParse(gameID).success || !ID.safeParse(clientID).success) {
-    res.sendStatus(400);
-    return;
-  }
-  try {
-    const response = await fetch(
-      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
-      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to kick player: ${response.statusText}`);
-    }
-    res.sendStatus(200);
-  } catch (error) {
-    log.error(`Error kicking player from game ${gameID}:`, error);
-    res.sendStatus(500);
-  }
-});
-
-app.get("*", function (req, res) {
-  res.sendFile(path.join(__dirname, "../../static/index.html"));
-});
+    <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
+    <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
+    
+    <script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")})});</script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
+</body>
+</html>
