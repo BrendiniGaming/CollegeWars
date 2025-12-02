@@ -27,16 +27,15 @@ const log = logger.child({ comp: "m" });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// --- Middleware Setup ---
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, "../../static"), {
-    maxAge: "1y", // Set max-age to 1 year for all static assets
+    maxAge: "1y",
     setHeaders: (res, path) => {
       if (path.endsWith(".html")) {
-        res.setHeader(
-          "Cache-Control",
-          "no-store, no-cache, must-revalidate, proxy-revalidate",
-        );
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
         res.setHeader("ETag", "");
@@ -49,35 +48,110 @@ app.use(
   }),
 );
 app.use(express.json());
-
 app.set("trust proxy", 3);
-app.use(
-  rateLimit({
-    windowMs: 1000,
-    max: 20,
-  }),
-);
+app.use(rateLimit({ windowMs: 1000, max: 20 }));
 
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
+// --- Helper Functions (Defined before usage) ---
+
+async function schedulePublicGame(playlist: MapPlaylist) {
+  const gameID = generateID();
+  publicLobbyIDs.add(gameID);
+  const workerPath = config.workerPath(gameID);
+  try {
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [config.adminHeader()]: config.adminToken(),
+        },
+        body: JSON.stringify(playlist.gameConfig()),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to schedule public game: ${response.statusText}`);
+    }
+  } catch (error) {
+    log.error(`Failed to schedule public game on worker ${workerPath}:`, error);
+    throw error;
+  }
+}
+
+async function fetchLobbies(): Promise<number> {
+  const fetchPromises: Promise<GameInfo | null>[] = [];
+  for (const gameID of new Set(publicLobbyIDs)) {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 5000);
+    const port = config.workerPort(gameID);
+    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
+      headers: { [config.adminHeader()]: config.adminToken() },
+      signal: controller.signal,
+    })
+      .then((resp) => resp.json())
+      .then((json) => {
+        return json as GameInfo;
+      })
+      .catch((error) => {
+        log.error(`Error fetching game ${gameID}:`, error);
+        publicLobbyIDs.delete(gameID);
+        return null;
+      });
+    fetchPromises.push(promise);
+  }
+  const results = await Promise.all(fetchPromises);
+  const lobbyInfos: GameInfo[] = results
+    .filter((result) => result !== null)
+    .map((gi: GameInfo) => {
+      return {
+        gameID: gi.gameID,
+        numClients: gi?.clients?.length ?? 0,
+        gameConfig: gi.gameConfig,
+        msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
+      } as GameInfo;
+    });
+
+  lobbyInfos.forEach((l) => {
+    if ("msUntilStart" in l && l.msUntilStart !== undefined && l.msUntilStart <= 250) {
+      publicLobbyIDs.delete(l.gameID);
+      return;
+    }
+    if (
+      "gameConfig" in l &&
+      l.gameConfig !== undefined &&
+      "maxPlayers" in l.gameConfig &&
+      l.gameConfig.maxPlayers !== undefined &&
+      "numClients" in l &&
+      l.numClients !== undefined &&
+      l.gameConfig.maxPlayers <= l.numClients
+    ) {
+      publicLobbyIDs.delete(l.gameID);
+      return;
+    }
+  });
+
+  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
+  return publicLobbyIDs.size;
+}
+
+// --- Main Master Logic ---
+
 export async function startMaster() {
   if (!cluster.isPrimary) {
-    throw new Error(
-      "startMaster() should only be called in the primary process",
-    );
+    throw new Error("startMaster() should only be called in the primary process");
   }
 
   // --- FIX #2: Hardcode Physical Workers to 1 ---
-  const NUM_WORKERS = 1; 
+  const NUM_WORKERS = 1;
 
   log.info(`Primary ${process.pid} is running`);
-  log.info(`Setting up ${NUM_WORKERS} workers...`); 
+  log.info(`Setting up ${NUM_WORKERS} workers...`);
 
   for (let i = 0; i < NUM_WORKERS; i++) {
-    const worker = cluster.fork({
-      WORKER_ID: i,
-    });
+    const worker = cluster.fork({ WORKER_ID: i });
     log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
   }
 
@@ -85,10 +159,7 @@ export async function startMaster() {
     if (message.type === "WORKER_READY") {
       const workerId = message.workerId;
       readyWorkers.add(workerId);
-      
-      log.info(
-        `Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`,
-      );
+      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
 
       if (readyWorkers.size === NUM_WORKERS) {
         log.info("All workers ready, starting game scheduling");
@@ -99,15 +170,13 @@ export async function startMaster() {
           });
         };
 
-        setInterval(
-          () =>
-            fetchLobbies().then((lobbies) => {
-              if (lobbies === 0) {
-                scheduleLobbies();
-              }
-            }),
-          100,
-        );
+        setInterval(() => {
+          fetchLobbies().then((lobbies) => {
+            if (lobbies === 0) {
+              scheduleLobbies();
+            }
+          });
+        }, 100);
       }
     }
   });
@@ -118,29 +187,24 @@ export async function startMaster() {
       log.error(`worker crashed could not find id`);
       return;
     }
-    log.warn(
-      `Worker ${workerId} (PID: ${worker.process.pid}) died with code: ${code} and signal: ${signal}`,
-    );
+    log.warn(`Worker ${workerId} (PID: ${worker.process.pid}) died with code: ${code} and signal: ${signal}`);
     log.info(`Restarting worker ${workerId}...`);
-
-    const newWorker = cluster.fork({
-      WORKER_ID: workerId,
-    });
-    log.info(
-      `Restarted worker ${workerId} (New PID: ${newWorker.process.pid})`,
-    );
+    const newWorker = cluster.fork({ WORKER_ID: workerId });
+    log.info(`Restarted worker ${workerId} (New PID: ${newWorker.process.pid})`);
   });
 
-  const PORT = 3000;
-  server.listen(PORT, () => {
-    log.info(`Master HTTP server listening on port ${PORT}`);
+  // --- FIX #3: Bind to 0.0.0.0 ---
+  const PORT = parseInt(process.env.PORT || "3000");
+  const HOST = "0.0.0.0";
+  server.listen(PORT, HOST, () => {
+    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
   });
 }
 
+// --- Routes ---
+
 app.get("/api/env", async (req, res) => {
-  const envConfig = {
-    game_env: process.env.GAME_ENV,
-  };
+  const envConfig = { game_env: process.env.GAME_ENV };
   if (!envConfig.game_env) return res.sendStatus(500);
   res.json(envConfig);
 });
@@ -164,9 +228,7 @@ app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
       `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
       {
         method: "POST",
-        headers: {
-          [config.adminHeader()]: config.adminToken(),
-        },
+        headers: { [config.adminHeader()]: config.adminToken() },
       },
     );
     if (!response.ok) {
@@ -179,11 +241,6 @@ app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
   }
 });
 
-async function fetchLobbies(): Promise<number> {
-  const fetchPromises: Promise<GameInfo | null>[] = [];
-  for (const gameID of new Set(publicLobbyIDs)) {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000); 
-    const port = config.workerPort(gameID);
-    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
-      headers: { [config
+app.get("*", function (req, res) {
+  res.sendFile(path.join(__dirname, "../../static/index.html"));
+});
