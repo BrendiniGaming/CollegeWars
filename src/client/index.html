@@ -6,31 +6,24 @@
     <title>College Wars</title>
     <link rel="manifest" href="../../resources/manifest.json">
     <link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg">
-    <link rel="canonical" href="https://collegewars.io/">
+    <link rel="canonical" href="https://collegewarsio.com/">
     <style>
+        /* Base styles to prevent FOUC */
         .preload * { transition: none !important; }
         html { visibility: visible; opacity: 1; }
         html.preload { visibility: hidden; opacity: 0; }
         .bg-image { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-image: url("/images/EuropeBackgroundBlurred.webp"); background-size: cover; }
         .bg-image::before { content: ""; position: absolute; width: 100%; height: 100vh; background: rgba(30, 58, 138, 0.2); }
         .college-logo { font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900; text-transform: uppercase; background: linear-gradient(to bottom, #FFD700, #DAA520); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5)); }
-        .header-ad-slot { margin-top: 10px; min-height: 90px; }
     </style>
     <script>document.documentElement.className = "preload";</script>
-    
-    <script async src="https://cdn.fuseplatform.net/publift/tags/2/4121/fuse.js"></script>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-WQGQQ8RDN4"></script>
-    <script>window.dataLayer = window.dataLayer || [];function gtag() { dataLayer.push(arguments); }gtag("js", new Date());gtag("config", "G-WQGQQ8RDN4");</script>
 </head>
 <body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
     <header class="l-header">
         <div class="l-header__content flex flex-col items-center justify-center">
             <h1 class="college-logo">COLLEGE WARS</h1>
             <div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div>
-            
-            <div id="ad-slot-leaderboard" class="header-ad-slot" style="display:block; width:728px; height:90px;">
-                </div>
-            </div>
+        </div>
     </header>
     <div class="bg-image"></div>
     
@@ -58,13 +51,23 @@
         </div>
     </main>
 
-    <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal>
-    <div id="app"></div><div id="radialMenu" class="radial-menu"></div>
-    <footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm">
-        <div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1">
-            </div>
-    </footer>
-    
+    <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
+    <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div>
+    <div id="app"></div>
+    <div id="radialMenu" class="radial-menu"></div>
+    <div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div>
+    <div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
+    <div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none">
+        <div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none">
+            <chat-display></chat-display>
+            <events-display></events-display>
+        </div>
+        <div style="pointer-events:auto"><control-panel></control-panel></div>
+    </div>
+
+    <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
+    <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
+
     <script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")})});</script>
 </body>
 </html>
