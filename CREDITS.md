@@ -1,9 +1,9 @@
 # Credits
 
 ## Developers
-Brendini- Lead Developer.
+Brendini - Owner - Website functionality.
 
-SleepyM - Design and Community.
+SleepyM - Coowner - Design and Community.
 
 ## Code
 
