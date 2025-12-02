@@ -17,7 +17,6 @@ const config = getServerConfigFromServer();
 // @ts-ignore
 config.numWorkers = () => 1;
 
-// --- ROBUST DATABASE CONNECTION ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
@@ -88,6 +87,37 @@ app.post("/api/login", async (req, res) => {
     res.json({ success: true, token, user: { username: user.username, wins: user.wins } });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// NEW: Auto-login check
+app.get("/api/me", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.sendStatus(401);
+  const token = authHeader.split(" ")[1];
+  try {
+    const verified = jwt.verify(token, JWT_SECRET) as any;
+    const result = await db.query("SELECT username, wins FROM users WHERE id = $1", [verified.id]);
+    if (result.rows.length === 0) return res.sendStatus(404);
+    res.json({ user: result.rows[0] });
+  } catch {
+    res.sendStatus(401);
+  }
+});
+
+// NEW: Update Stats on Win/Loss
+app.post("/api/update-stats", async (req, res) => {
+  const { token, didWin } = req.body;
+  try {
+    const verified = jwt.verify(token, JWT_SECRET) as any;
+    // Increment games played, and wins if applicable
+    await db.query(
+      "UPDATE users SET games_played = games_played + 1, wins = wins + $1 WHERE id = $2",
+      [didWin ? 1 : 0, verified.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.sendStatus(401);
   }
 });
 
