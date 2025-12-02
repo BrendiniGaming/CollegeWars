@@ -40,32 +40,4 @@
             <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
             <div class="container__row container__row--equal">
                 <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
-                <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
-            </div>
-            <o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button>
-            <o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
-            <div class="container__row"><lang-selector class="w-full"></lang-selector></div>
-        </div>
-    </main>
-
-    <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
-    <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div>
-    <div id="app"></div>
-    <div id="radialMenu" class="radial-menu"></div>
-    <div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div>
-    <div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
-    <div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none">
-        <div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none">
-            <chat-display></chat-display>
-            <events-display></events-display>
-        </div>
-        <div style="pointer-events:auto"><control-panel></control-panel></div>
-    </div>
-
-    <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
-    <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
-    
-    <script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")})});</script>
-    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
-</body>
-</html>
+                <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o
