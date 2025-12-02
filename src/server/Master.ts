@@ -13,6 +13,7 @@ import { MapPlaylist } from "./MapPlaylist";
 const config = getServerConfigFromServer();
 
 // --- CRITICAL FIX: Worker Limit (Prevents 502/Memory Crash) ---
+// This tells the game engine: "Stop looking for workers 1-20. Only Worker 0 exists."
 // @ts-ignore
 config.numWorkers = () => 1;
 // ---------------------------------------------------------------
