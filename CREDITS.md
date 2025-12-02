@@ -1,5 +1,10 @@
 # Credits
 
+## Developers
+Brendini- Lead Developer.
+
+SleepyM - Design and Community.
+
 ## Code
 
 OpenFront is licensed under AGPL-3.0.  
