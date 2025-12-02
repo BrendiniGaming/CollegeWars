@@ -47,6 +47,7 @@ app.use(
     },
   }),
 );
+app.use(express.json());
 app.set("trust proxy", 3);
 app.use(rateLimit({ windowMs: 1000, max: 20 }));
 
@@ -159,7 +160,7 @@ export async function startMaster() {
     if (message.type === "WORKER_READY") {
       const workerId = message.workerId;
       readyWorkers.add(workerId);
-      log.info(`Worker ${workerId} is ready.`);
+      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
 
       if (readyWorkers.size === NUM_WORKERS) {
         log.info("All workers ready, starting game scheduling");
@@ -170,9 +171,7 @@ export async function startMaster() {
         };
         setInterval(() => {
           fetchLobbies().then((lobbies) => {
-            if (lobbies === 0) {
-              scheduleLobbies();
-            }
+            if (lobbies === 0) scheduleLobbies();
           });
         }, 100);
       }
@@ -208,14 +207,23 @@ app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
     return res.status(401).send("Unauthorized");
   }
   const { gameID, clientID } = req.params;
+  if (!ID.safeParse(gameID).success || !ID.safeParse(clientID).success) {
+    res.sendStatus(400);
+    return;
+  }
   try {
     const response = await fetch(
       `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
       { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
     );
-    if (!response.ok) throw new Error();
+    if (!response.ok) {
+      throw new Error(`Failed to kick player: ${response.statusText}`);
+    }
     res.sendStatus(200);
-  } catch { res.sendStatus(500); }
+  } catch (error) {
+    log.error(`Error kicking player from game ${gameID}:`, error);
+    res.sendStatus(500);
+  }
 });
 
 app.get("*", function (req, res) {
