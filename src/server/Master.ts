@@ -28,7 +28,6 @@ const log = logger.child({ comp: "m" });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Middleware ---
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, "../../static"), {
