@@ -1,12 +1,10 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" class="h-full" translate="no">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>College Wars</title>
-<link rel="manifest" href="../../resources/manifest.json" />
-<link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg" />
-<link rel="canonical" href="https://collegewars.io/" />
+<link rel="manifest" href="../../resources/manifest.json"><link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg">
+<link rel="canonical" href="https://collegewars.io/">
 <style>
 .preload *{transition:none !important}html{visibility:visible;opacity:1}html.preload{visibility:hidden;opacity:0}
 .bg-image{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background-image:url("/images/EuropeBackgroundBlurred.webp");background-size:cover}
@@ -33,8 +31,8 @@
 <div class="group"><input id="login-email" type="email" placeholder="Student Email" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all"/></div>
 <div class="group"><input id="login-pass" type="password" placeholder="Password" class="w-full p-3 bg-gray-800/50 border border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-white placeholder-gray-500 transition-all"/></div>
 <div class="flex gap-3 pt-2">
-<button onclick="login()" class="flex-1 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide">LOGIN</button>
-<button onclick="register()" class="flex-1 bg-gradient-to-br from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm tracking-wide">ENROL</button>
+<button onclick="login()" class="flex-1 bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-900/20 transition-all">LOGIN</button>
+<button onclick="register()" class="flex-1 bg-gradient-to-br from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-green-900/20 transition-all">ENROL</button>
 </div></div>
 <div id="auth-status" class="mt-4 text-center text-sm font-medium min-h-[20px] text-blue-300/80"></div>
 </div>
@@ -49,4 +47,11 @@ async function login(){const e=document.getElementById("login-email").value,t=do
 <div class="container__row"><lang-selector class="w-full"></lang-selector></div></div></main>
 <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
 <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div><div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
-<div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px
+<div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none"><div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none"><chat-display></chat-display><events-display></events-display></div><div style="pointer-events:auto"><control-panel></control-panel></div></div>
+<footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Discord</span></a></div><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
+<account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
+<div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
+<script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")})});</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
+</body>
+</html>
