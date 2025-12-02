@@ -13,8 +13,6 @@ import { MapPlaylist } from "./MapPlaylist";
 const config = getServerConfigFromServer();
 
 // --- CRITICAL FIX: Ghost Worker Prevention ---
-// This tells the game engine: "Stop looking for workers 1-20. Only Worker 0 exists."
-// This fixes the issue where buttons click but nothing happens.
 // @ts-ignore
 config.numWorkers = () => 1;
 // ---------------------------------------------
@@ -62,8 +60,6 @@ async function schedulePublicGame(playlist: MapPlaylist) {
   publicLobbyIDs.add(gameID);
   const workerPath = config.workerPath(gameID);
   try {
-    // We strictly use workerPort(gameID) here, which will now correctly resolve 
-    // because we forced config.numWorkers to 1.
     const response = await fetch(
       `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
       {
@@ -130,4 +126,98 @@ async function fetchLobbies(): Promise<number> {
       l.gameConfig.maxPlayers !== undefined &&
       "numClients" in l &&
       l.numClients !== undefined &&
-      l
+      l.gameConfig.maxPlayers <= l.numClients
+    ) {
+      publicLobbyIDs.delete(l.gameID);
+      return;
+    }
+  });
+
+  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
+  return publicLobbyIDs.size;
+}
+
+// --- MAIN START FUNCTION ---
+
+export async function startMaster() {
+  if (!cluster.isPrimary) {
+    throw new Error("startMaster() should only be called in the primary process");
+  }
+
+  // --- CRASH FIX: Hardcode Workers to 1 ---
+  const NUM_WORKERS = 1;
+
+  log.info(`Primary ${process.pid} is running`);
+  log.info(`Setting up ${NUM_WORKERS} workers...`);
+
+  for (let i = 0; i < NUM_WORKERS; i++) {
+    const worker = cluster.fork({ WORKER_ID: i });
+    log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
+  }
+
+  cluster.on("message", (worker, message) => {
+    if (message.type === "WORKER_READY") {
+      const workerId = message.workerId;
+      readyWorkers.add(workerId);
+      log.info(`Worker ${workerId} is ready.`);
+
+      if (readyWorkers.size === NUM_WORKERS) {
+        log.info("All workers ready, starting game scheduling");
+        const scheduleLobbies = () => {
+          schedulePublicGame(playlist).catch((error) => {
+            log.error("Error scheduling public game:", error);
+          });
+        };
+        setInterval(() => {
+          fetchLobbies().then((lobbies) => {
+            if (lobbies === 0) {
+              scheduleLobbies();
+            }
+          });
+        }, 100);
+      }
+    }
+  });
+
+  cluster.on("exit", (worker, code, signal) => {
+    const workerId = (worker as any).process?.env?.WORKER_ID;
+    if (workerId) cluster.fork({ WORKER_ID: workerId });
+  });
+
+  const PORT = parseInt(process.env.PORT || "3000");
+  const HOST = "0.0.0.0";
+  server.listen(PORT, HOST, () => {
+    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
+  });
+}
+
+// --- Routes ---
+
+app.get("/api/env", async (req, res) => {
+  const envConfig = { game_env: process.env.GAME_ENV };
+  if (!envConfig.game_env) return res.sendStatus(500);
+  res.json(envConfig);
+});
+
+app.get("/api/public_lobbies", async (req, res) => {
+  res.send(publicLobbiesJsonStr);
+});
+
+app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
+  if (req.headers[config.adminHeader()] !== config.adminToken()) {
+    return res.status(401).send("Unauthorized");
+  }
+  const { gameID, clientID } = req.params;
+  try {
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
+      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
+    );
+    if (!response.ok) throw new Error();
+    res.sendStatus(200);
+  } catch { res.sendStatus(500); }
+});
+
+app.get("*", function (req, res) {
+  res.sendFile(path.join(__dirname, "../../static/index.html"));
+});
