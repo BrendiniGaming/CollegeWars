@@ -9,169 +9,84 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
-import { Pool } from "pg";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 const config = getServerConfigFromServer();
+
+// --- CRASH FIXES (KEEP THESE) ---
 // @ts-ignore
 config.numWorkers = () => 1;
-
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
-});
-const JWT_SECRET = "CollegeWarsSecretKey123";
-
-async function initDB() {
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        wins INT DEFAULT 0,
-        games_played INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    logger.info("Database initialized.");
-  } catch (err) {
-    logger.error("Database init failed:", err);
-  }
-}
+// --------------------------------
 
 const playlist = new MapPlaylist();
 const readyWorkers = new Set();
+
 const app = express();
 const server = http.createServer(app);
+
 const log = logger.child({ comp: "m" });
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../../static"), { maxAge: "1y" }));
+app.use(
+  express.static(path.join(__dirname, "../../static"), {
+    maxAge: "1y",
+    setHeaders: (res, path) => {
+      if (path.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        res.setHeader("ETag", "");
+      } else if (path.match(/\.(js|css|svg)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else if (path.match(/\.(bin|dat|exe|dll|so|dylib)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  }),
+);
+app.use(express.json());
 app.set("trust proxy", 3);
 app.use(rateLimit({ windowMs: 1000, max: 20 }));
 
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- ACCOUNT ROUTES ---
-app.post("/api/register", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password) return res.status(400).json({ error: "Missing fields" });
-  try {
-    const userCheck = await db.query("SELECT * FROM users WHERE email = $1 OR username = $2", [email, username]);
-    if (userCheck.rows.length > 0) return res.status(400).json({ error: "User exists" });
-    const hash = await bcrypt.hash(password, 10);
-    const newUser = await db.query(
-      "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, wins",
-      [username, email, hash]
-    );
-    res.json({ success: true, user: newUser.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
-    if (result.rows.length === 0) return res.status(400).json({ error: "User not found" });
-    const user = result.rows[0];
-    if (!(await bcrypt.compare(password, user.password_hash))) return res.status(400).json({ error: "Invalid password" });
-    const token = jwt.sign({ id: user.id }, JWT_SECRET);
-    res.json({ success: true, token, user: { username: user.username, wins: user.wins } });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// NEW: Auto-login check
-app.get("/api/me", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.sendStatus(401);
-  const token = authHeader.split(" ")[1];
-  try {
-    const verified = jwt.verify(token, JWT_SECRET) as any;
-    const result = await db.query("SELECT username, wins FROM users WHERE id = $1", [verified.id]);
-    if (result.rows.length === 0) return res.sendStatus(404);
-    res.json({ user: result.rows[0] });
-  } catch {
-    res.sendStatus(401);
-  }
-});
-
-// NEW: Update Stats on Win/Loss
-app.post("/api/update-stats", async (req, res) => {
-  const { token, didWin } = req.body;
-  try {
-    const verified = jwt.verify(token, JWT_SECRET) as any;
-    // Increment games played, and wins if applicable
-    await db.query(
-      "UPDATE users SET games_played = games_played + 1, wins = wins + $1 WHERE id = $2",
-      [didWin ? 1 : 0, verified.id]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.sendStatus(401);
-  }
-});
-
-// --- HELPER FUNCTIONS ---
-async function schedulePublicGame(playlist: MapPlaylist) {
-  const gameID = generateID();
-  publicLobbyIDs.add(gameID);
-  const workerPath = config.workerPath(gameID);
-  try {
-    const response = await fetch(`http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", [config.adminHeader()]: config.adminToken() },
-      body: JSON.stringify(playlist.gameConfig()),
-    });
-    if (!response.ok) throw new Error(response.statusText);
-  } catch (error) {
-    log.error(`Failed to schedule game:`, error);
-  }
-}
-
-async function fetchLobbies(): Promise<number> {
-  const fetchPromises: Promise<GameInfo | null>[] = [];
-  for (const gameID of new Set(publicLobbyIDs)) {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000);
-    const port = config.workerPort(gameID);
-    fetchPromises.push(fetch(`http://localhost:${port}/api/game/${gameID}`, {
-      headers: { [config.adminHeader()]: config.adminToken() },
-      signal: controller.signal,
-    }).then((r) => r.json()).then((j) => j as GameInfo).catch(() => { publicLobbyIDs.delete(gameID); return null; }));
-  }
-  const results = await Promise.all(fetchPromises);
-  const lobbyInfos = results.filter((r): r is GameInfo => r !== null).map((gi) => ({
-    gameID: gi.gameID, numClients: gi?.clients?.length ?? 0, gameConfig: gi.gameConfig, msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
-  }));
-  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
-  return publicLobbyIDs.size;
-}
-
-// --- MAIN START FUNCTION ---
 export async function startMaster() {
-  if (!cluster.isPrimary) throw new Error("startMaster() only in primary");
-  await initDB();
+  if (!cluster.isPrimary) {
+    throw new Error("startMaster() should only be called in the primary process");
+  }
+
+  // --- CRASH FIX: Hardcode Workers to 1 ---
   const NUM_WORKERS = 1;
-  log.info(`Primary ${process.pid} running. Setting up ${NUM_WORKERS} workers...`);
-  for (let i = 0; i < NUM_WORKERS; i++) cluster.fork({ WORKER_ID: i });
+
+  log.info(`Primary ${process.pid} is running`);
+  log.info(`Setting up ${NUM_WORKERS} workers...`);
+
+  for (let i = 0; i < NUM_WORKERS; i++) {
+    const worker = cluster.fork({ WORKER_ID: i });
+    log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
+  }
 
   cluster.on("message", (worker, message) => {
     if (message.type === "WORKER_READY") {
       const workerId = message.workerId;
       readyWorkers.add(workerId);
+      log.info(`Worker ${workerId} is ready.`);
+
       if (readyWorkers.size === NUM_WORKERS) {
-        log.info("All workers ready.");
-        setInterval(() => { fetchLobbies().then((lobbies) => { if (lobbies === 0) schedulePublicGame(playlist).catch(console.error); }); }, 100);
+        log.info("All workers ready, starting game scheduling");
+        const scheduleLobbies = () => {
+          schedulePublicGame(playlist).catch((error) => {
+            log.error("Error scheduling public game:", error);
+          });
+        };
+        setInterval(() => {
+          fetchLobbies().then((lobbies) => {
+            if (lobbies === 0) scheduleLobbies();
+          });
+        }, 100);
       }
     }
   });
@@ -182,20 +97,76 @@ export async function startMaster() {
   });
 
   const PORT = parseInt(process.env.PORT || "3000");
-  server.listen(PORT, "0.0.0.0", () => {
-    log.info(`Master listening on port ${PORT}`);
+  const HOST = "0.0.0.0";
+  server.listen(PORT, HOST, () => {
+    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
   });
 }
 
-app.get("/api/env", async (req, res) => res.json({ game_env: process.env.GAME_ENV }));
-app.get("/api/public_lobbies", async (req, res) => res.send(publicLobbiesJsonStr));
+app.get("/api/env", async (req, res) => {
+  const envConfig = { game_env: process.env.GAME_ENV };
+  if (!envConfig.game_env) return res.sendStatus(500);
+  res.json(envConfig);
+});
+
+app.get("/api/public_lobbies", async (req, res) => {
+  res.send(publicLobbiesJsonStr);
+});
+
 app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
-  if (req.headers[config.adminHeader()] !== config.adminToken()) return res.sendStatus(401);
+  if (req.headers[config.adminHeader()] !== config.adminToken()) {
+    return res.status(401).send("Unauthorized");
+  }
+  const { gameID, clientID } = req.params;
   try {
-    const { gameID, clientID } = req.params;
-    const resp = await fetch(`http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`, { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } });
-    if (!resp.ok) throw new Error();
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
+      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
+    );
+    if (!response.ok) throw new Error();
     res.sendStatus(200);
   } catch { res.sendStatus(500); }
 });
-app.get("*", (req, res) => res.sendFile(path.join(__dirname, "../../static/index.html")));
+
+async function fetchLobbies(): Promise<number> {
+  const fetchPromises: Promise<GameInfo | null>[] = [];
+  for (const gameID of new Set(publicLobbyIDs)) {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 5000);
+    const port = config.workerPort(gameID);
+    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
+      headers: { [config.adminHeader()]: config.adminToken() },
+      signal: controller.signal,
+    }).then((r) => r.json()).then((j) => j as GameInfo).catch(() => { publicLobbyIDs.delete(gameID); return null; });
+    fetchPromises.push(promise);
+  }
+  const results = await Promise.all(fetchPromises);
+  const lobbyInfos: GameInfo[] = results.filter((r): r is GameInfo => r !== null).map((gi) => ({
+    gameID: gi.gameID, numClients: gi?.clients?.length ?? 0, gameConfig: gi.gameConfig, msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
+  }));
+  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
+  return publicLobbyIDs.size;
+}
+
+async function schedulePublicGame(playlist: MapPlaylist) {
+  const gameID = generateID();
+  publicLobbyIDs.add(gameID);
+  const workerPath = config.workerPath(gameID);
+  try {
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/create_game/${gameID}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [config.adminHeader()]: config.adminToken() },
+        body: JSON.stringify(playlist.gameConfig()),
+      },
+    );
+    if (!response.ok) throw new Error(response.statusText);
+  } catch (error) {
+    log.error(`Failed to schedule public game on worker ${workerPath}:`, error);
+  }
+}
+
+app.get("*", function (req, res) {
+  res.sendFile(path.join(__dirname, "../../static/index.html"));
+});
