@@ -24,8 +24,8 @@ ENV GIT_COMMIT="$GIT_COMMIT"
 ENV HUSKY=0
 # Copy package.json and package-lock.json
 COPY package*.json ./
-# Install dependencies
-RUN npm ci
+# Install dependencies (CHANGED from npm ci to npm install)
+RUN npm install
 # Copy the rest of the application code
 COPY . .
 # Build the client-side application
@@ -45,8 +45,8 @@ ENV HUSKY=0
 ENV NPM_CONFIG_IGNORE_SCRIPTS=1
 # Copy package.json and package-lock.json
 COPY package*.json ./
-# Install dependencies
-RUN npm ci --omit=dev
+# Install dependencies (CHANGED from npm ci to npm install)
+RUN npm install --omit=dev
 
 # Final image
 FROM base
