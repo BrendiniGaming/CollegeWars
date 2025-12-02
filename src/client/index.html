@@ -16,10 +16,12 @@
         .college-logo { font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900; text-transform: uppercase; background: linear-gradient(to bottom, #FFD700, #DAA520); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5)); }
         
         /* Auth Box Styles */
-        #auth-box { width: 100%; max-width: 400px; margin: 0 auto 20px auto; padding: 20px; background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 12px; color: white; backdrop-filter: blur(10px); }
-        #auth-box input { width: 100%; padding: 10px; margin-bottom: 10px; background: rgba(31, 41, 55, 0.5); border: 1px solid #4B5563; border-radius: 6px; color: white; }
-        #auth-box button { width: 48%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; }
-        .btn-login { background: #2563EB; } .btn-enrol { background: #059669; }
+        #auth-box { width: 100%; max-width: 400px; margin: 0 auto 20px auto; padding: 20px; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 12px; color: white; backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative; z-index: 50; }
+        #auth-box input { width: 100%; padding: 12px; margin-bottom: 12px; background: rgba(31, 41, 55, 0.8); border: 1px solid #4B5563; border-radius: 6px; color: white; font-size: 16px; }
+        #auth-box button { width: 48%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; transition: transform 0.1s; }
+        #auth-box button:active { transform: scale(0.98); }
+        .btn-login { background: linear-gradient(135deg, #2563EB, #1D4ED8); } 
+        .btn-enrol { background: linear-gradient(135deg, #059669, #047857); }
     </style>
     <script>document.documentElement.className = "preload";</script>
 </head>
@@ -35,7 +37,7 @@
     <main class="flex justify-center flex-grow">
         <div class="container pt-12">
             <div id="auth-box">
-                <h3 style="text-align:center; margin-bottom:15px; color:#60A5FA; font-weight:bold;">STUDENT PORTAL</h3>
+                <h3 style="text-align:center; margin-bottom:15px; color:#60A5FA; font-weight:bold; letter-spacing: 1px;">STUDENT PORTAL</h3>
                 <div id="login-inputs">
                     <input id="login-email" type="email" placeholder="Student Email" />
                     <input id="login-pass" type="password" placeholder="Password" />
@@ -44,7 +46,7 @@
                         <button class="btn-enrol" onclick="register()">ENROL</button>
                     </div>
                 </div>
-                <div id="auth-status" style="margin-top:10px; text-align:center; font-size:14px; min-height:20px;">Checking session...</div>
+                <div id="auth-status" style="margin-top:15px; text-align:center; font-size:14px; min-height:20px; color: #93C5FD;">Checking session...</div>
             </div>
 
             <div class="container__row">
@@ -94,19 +96,37 @@
 
     function showLoggedIn(username, wins) {
         document.getElementById("login-inputs").style.display = "none";
-        document.getElementById("auth-status").innerHTML = `Welcome back, <span style="color:#93C5FD">${username}</span><br>Wins: <span style="color:#4ADE80">${wins}</span><br><button onclick="logout()" style="background:none; border:none; color:#F87171; text-decoration:underline; cursor:pointer; margin-top:5px;">Logout</button>`;
+        document.getElementById("auth-status").innerHTML = `Welcome back, <span style="color:#93C5FD; font-size:1.1em; font-weight:bold;">${username}</span><br>Wins: <span style="color:#4ADE80; font-weight:bold;">${wins}</span><br><button onclick="logout()" style="background:none; border:none; color:#F87171; text-decoration:underline; cursor:pointer; margin-top:8px; font-size:12px;">Logout</button>`;
         injectUsername(username);
         observeGame();
     }
 
+    // --- ROBUST INJECTION FIX ---
     function injectUsername(name) {
         localStorage.setItem("username", name);
-        setTimeout(() => {
-            const input = document.querySelector("username-input input");
-            const box = document.querySelector("username-input");
-            if (input) { input.value = name; input.dispatchEvent(new Event('input')); input.dispatchEvent(new Event('change')); }
-            if (box) box.style.display = 'none';
-        }, 500);
+        
+        // Loop to check if the game input is ready
+        let attempts = 0;
+        const interval = setInterval(() => {
+            const component = document.querySelector("username-input");
+            const input = component ? component.querySelector("input") : null;
+            
+            if (input && component) {
+                // Force value into game engine
+                input.value = name;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                
+                // Hide it only after filling it
+                component.style.display = 'none';
+                
+                clearInterval(interval); // Stop checking
+            }
+            
+            attempts++;
+            if (attempts > 20) clearInterval(interval); // Stop after 10 seconds to save performance
+        }, 500); // Check every half second
     }
 
     function logout() { localStorage.removeItem("cw_token"); location.reload(); }
@@ -134,5 +154,6 @@
 
     window.addEventListener("load", () => requestAnimationFrame(() => document.documentElement.classList.remove("preload")));
     </script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
 </body>
 </html>
