@@ -23,11 +23,11 @@ config.numWorkers = () => 1;
 // --- DATABASE & AUTH SETUP ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Required for Railway
+  ssl: { rejectUnauthorized: false }
 });
-const JWT_SECRET = "CollegeWarsSecretKey123"; // You can change this to a random string later
+const JWT_SECRET = "CollegeWarsSecretKey123";
 
-// Automatically create the users table on startup
+// Function to Create Table Automatically
 async function initDB() {
   try {
     await db.query(`
@@ -46,7 +46,6 @@ async function initDB() {
     logger.error("Database initialization failed:", err);
   }
 }
-// -----------------------------
 
 const playlist = new MapPlaylist();
 const readyWorkers = new Set();
@@ -59,7 +58,6 @@ const log = logger.child({ comp: "m" });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Middleware ---
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, "../../static"), {
@@ -84,22 +82,19 @@ app.use(rateLimit({ windowMs: 1000, max: 20 }));
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- ACCOUNT ROUTES (Register/Login) ---
+// --- ACCOUNT ROUTES ---
 
 app.post("/api/register", async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) return res.status(400).json({ error: "Missing fields" });
 
   try {
-    // Check if user exists
     const userCheck = await db.query("SELECT * FROM users WHERE email = $1 OR username = $2", [email, username]);
     if (userCheck.rows.length > 0) return res.status(400).json({ error: "User already exists" });
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    // Save to DB
     const newUser = await db.query(
       "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, wins",
       [username, email, hash]
@@ -107,33 +102,29 @@ app.post("/api/register", async (req, res) => {
     res.json({ success: true, user: newUser.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error during registration" });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    // Find user
     const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     if (result.rows.length === 0) return res.status(400).json({ error: "User not found" });
 
     const user = result.rows[0];
-    // Check password
     const validPass = await bcrypt.compare(password, user.password_hash);
     if (!validPass) return res.status(400).json({ error: "Invalid password" });
 
-    // Generate Token
     const token = jwt.sign({ id: user.id }, JWT_SECRET);
     res.json({ success: true, token, user: { username: user.username, wins: user.wins } });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error during login" });
+    res.status(500).json({ error: "Server error" });
   }
 });
-// ---------------------------------------
 
-// --- Helper Functions ---
+// --- HELPER FUNCTIONS ---
 
 async function schedulePublicGame(playlist: MapPlaylist) {
   const gameID = generateID();
@@ -168,3 +159,14 @@ async function fetchLobbies(): Promise<number> {
     const port = config.workerPort(gameID);
     const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
       headers: { [config.adminHeader()]: config.adminToken() },
+      signal: controller.signal,
+    })
+      .then((resp) => resp.json())
+      .then((json) => json as GameInfo)
+      .catch(() => {
+        publicLobbyIDs.delete(gameID);
+        return null;
+      });
+    fetchPromises.push(promise);
+  }
+  const results =
