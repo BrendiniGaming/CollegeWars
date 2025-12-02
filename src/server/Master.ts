@@ -222,10 +222,4 @@ app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
     res.sendStatus(200);
   } catch (error) {
     log.error(`Error kicking player from game ${gameID}:`, error);
-    res.sendStatus(500);
-  }
-});
-
-app.get("*", function (req, res) {
-  res.sendFile(path.join(__dirname, "../../static/index.html"));
-});
+    res.sendStatus(500
