@@ -131,13 +131,9 @@ export async function startMaster() {
     );
   });
 
-  // --- FIX #3: BIND TO 0.0.0.0 AND USE ENV PORT ---
-  // This is the part that was missing!
-  const PORT = parseInt(process.env.PORT || "3000");
-  const HOST = "0.0.0.0"; 
-
-  server.listen(PORT, HOST, () => {
-    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
+  const PORT = 3000;
+  server.listen(PORT, () => {
+    log.info(`Master HTTP server listening on port ${PORT}`);
   });
 }
 
@@ -190,47 +186,4 @@ async function fetchLobbies(): Promise<number> {
     setTimeout(() => controller.abort(), 5000); 
     const port = config.workerPort(gameID);
     const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
-      headers: { [config.adminHeader()]: config.adminToken() },
-      signal: controller.signal,
-    })
-      .then((resp) => resp.json())
-      .then((json) => {
-        return json as GameInfo;
-      })
-      .catch((error) => {
-        log.error(`Error fetching game ${gameID}:`, error);
-        publicLobbyIDs.delete(gameID);
-        return null;
-      });
-    fetchPromises.push(promise);
-  }
-  const results = await Promise.all(fetchPromises);
-  const lobbyInfos: GameInfo[] = results
-    .filter((result) => result !== null)
-    .map((gi: GameInfo) => {
-      return {
-        gameID: gi.gameID,
-        numClients: gi?.clients?.length ?? 0,
-        gameConfig: gi.gameConfig,
-        msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
-      } as GameInfo;
-    });
-
-  lobbyInfos.forEach((l) => {
-    if ("msUntilStart" in l && l.msUntilStart !== undefined && l.msUntilStart <= 250) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-    if ("gameConfig" in l && l.gameConfig !== undefined && "maxPlayers" in l.gameConfig && l.gameConfig.maxPlayers !== undefined && "numClients" in l && l.numClients !== undefined && l.gameConfig.maxPlayers <= l.numClients) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-  });
-
-  publicLobbiesJsonStr = JSON.stringify({
-    lobbies: lobbyInfos,
-  });
-  return publicLobbyIDs.size;
-}
-
-async function schedulePublicGame(playlist
+      headers: { [config
