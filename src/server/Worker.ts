@@ -67,7 +67,6 @@ app.get("/api/discord/callback", async (req, res) => {
   }
 
   try {
-    // Step 1: Exchange code for access token
     const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -80,7 +79,7 @@ app.get("/api/discord/callback", async (req, res) => {
       }),
     });
     const tokenData = await tokenResponse.json();
-    console.log("Token data:", tokenData); // ✅ log the token response
+    console.log("Token data:", tokenData);
 
     if (!tokenData.access_token) {
       return res.status(400).send("Failed to get access token");
@@ -90,43 +89,15 @@ app.get("/api/discord/callback", async (req, res) => {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const discordUser = await userResponse.json();
-    console.log("Discord user:", discordUser); // ✅ log the user profile
+    console.log("Discord user:", discordUser);
 
     const sessionToken = jwt.sign(
       { id: discordUser.id, username: discordUser.username },
       process.env.JWT_SECRET!,
       { expiresIn: "7d" }
     );
+    console.log("Session token created:", sessionToken);
 
-    console.log("Session token created:", sessionToken); // ✅ log the JWT
-
-    res.redirect(
-      `/?token=${sessionToken}&username=${encodeURIComponent(discordUser.username)}`
-    );
-  } catch (err) {
-    console.error("Discord OAuth error:", err); // ✅ log any errors
-    res.status(500).send("OAuth failed");
-  }
-});
-
-    if (!tokenData.access_token) {
-      return res.status(400).send("Failed to get access token");
-    }
-
-    // Step 2: Fetch Discord user
-    const userResponse = await fetch("https://discord.com/api/users/@me", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const discordUser = await userResponse.json();
-
-    // Step 3: Create your own session token
-    const sessionToken = jwt.sign(
-      { id: discordUser.id, username: discordUser.username },
-      process.env.JWT_SECRET!,
-      { expiresIn: "7d" }
-    );
-
-    // Step 4: Redirect back to front‑end with ?token=...
     res.redirect(
       `/?token=${sessionToken}&username=${encodeURIComponent(discordUser.username)}`
     );
@@ -135,6 +106,7 @@ app.get("/api/discord/callback", async (req, res) => {
     res.status(500).send("OAuth failed");
   }
 });
+
 
   const gm = new GameManager(config, log);
 
