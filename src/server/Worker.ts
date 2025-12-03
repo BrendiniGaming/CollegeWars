@@ -1,3 +1,6 @@
+import jwt from "jsonwebtoken";       // for signing session tokens
+import * as dotenv from "dotenv";     // to load your .env file
+dotenv.config();                      // make sure environment variables are available
 import compression from "compression";
 import express, { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
@@ -73,10 +76,38 @@ app.get("/api/discord/callback", async (req, res) => {
         client_secret: process.env.DISCORD_CLIENT_SECRET!,
         grant_type: "authorization_code",
         code,
-        redirect_uri: "https://www.collegewarsio.com/api/discord/callback",
+        redirect_uri: process.env.DISCORD_REDIRECT_URI!,
       }),
     });
     const tokenData = await tokenResponse.json();
+    console.log("Token data:", tokenData); // ✅ log the token response
+
+    if (!tokenData.access_token) {
+      return res.status(400).send("Failed to get access token");
+    }
+
+    const userResponse = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const discordUser = await userResponse.json();
+    console.log("Discord user:", discordUser); // ✅ log the user profile
+
+    const sessionToken = jwt.sign(
+      { id: discordUser.id, username: discordUser.username },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    console.log("Session token created:", sessionToken); // ✅ log the JWT
+
+    res.redirect(
+      `/?token=${sessionToken}&username=${encodeURIComponent(discordUser.username)}`
+    );
+  } catch (err) {
+    console.error("Discord OAuth error:", err); // ✅ log any errors
+    res.status(500).send("OAuth failed");
+  }
+});
 
     if (!tokenData.access_token) {
       return res.status(400).send("Failed to get access token");
