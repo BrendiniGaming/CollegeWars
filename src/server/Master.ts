@@ -27,7 +27,7 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; // FIX: Added robust fallback
+const JWT_SECRET = process.env.JWT_SECRET; // FIX: Reading directly without strict initial type
 // --------------------------------------------
 
 // --- Rank System Definitions ---
