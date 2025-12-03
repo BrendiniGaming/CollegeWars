@@ -9,7 +9,7 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
-// --- REQUIRED IMPORTS FOR DB/AUTH ---
+// --- NEW ACCOUNT IMPORTS ---
 import { Pool } from "pg"; 
 import bcrypt from "bcryptjs"; 
 import jwt from "jsonwebtoken";
@@ -27,10 +27,10 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET as string; // Reads from ENV
+const JWT_SECRET: string = process.env.JWT_SECRET as string;
 // --------------------------------------------
 
-// --- Rank System Definitions (9 Tiers) ---
+// --- Rank System Definitions ---
 const TIER_ORDER = [
   "UNRANKED", "BRONZE", "SILVER", "GOLD", "PLATINUM", "CHAMPION", "GRAND_CHAMPION", 
   "HEROIC_CHAMPION", "MASTER_CHAMPION", "MASTERS",
@@ -62,7 +62,8 @@ async function initDB(): Promise<void> {
         id SERIAL PRIMARY KEY,
         discord_id VARCHAR(255) UNIQUE, 
         username VARCHAR(50), 
-        email VARCHAR(255), 
+        email VARCHAR(255) UNIQUE, 
+        password_hash VARCHAR(255), 
         wins INT DEFAULT 0,
         games_played INT DEFAULT 0,
         rank_tier VARCHAR(50) DEFAULT 'UNRANKED', 
@@ -283,7 +284,7 @@ app.post("/api/report-game", async (req, res) => {
 
     let currentXP = userRes.rows[0].rank_xp;
     let wins = userRes.rows[0].wins;
-    let games_played = userRes.rows[0].games_played;
+    let gamesPlayed = userRes.rows[0].games_played;
 
     // 2. Calculate new stats
     const baseXP = 50;
@@ -292,7 +293,7 @@ app.post("/api/report-game", async (req, res) => {
 
     currentXP += totalXP;
     wins += (result === "win" ? 1 : 0);
-    games_played += 1;
+    gamesPlayed += 1;
 
     // 3. Calculate new tier
     const newTier = getRankTier(currentXP);
@@ -300,10 +301,10 @@ app.post("/api/report-game", async (req, res) => {
     // 4. Save back to DB
     await db.query(
       "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
-      [currentXP, newTier, wins, games_played, userId]
+      [currentXP, newTier, wins, gamesPlayed, userId]
     );
 
-    res.json({ userId, rank_xp: currentXP, rank_tier: newTier, wins, games_played: games_played });
+    res.json({ userId, rank_xp: currentXP, rank_tier: newTier, wins, games_played: gamesPlayed });
   } catch (err) {
     logger.error("Error updating rank:", err);
     res.status(500).send("Internal server error");
