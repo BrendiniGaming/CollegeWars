@@ -126,93 +126,68 @@
         observeGame();
     }
 
-    // --- CRITICAL FIX: Robust URL Parsing ---
+   // --- CRITICAL FIX: Robust URL Parsing ---
 async function handleAuthRedirect() {
     const urlParams = new URLSearchParams(window.location.search);
     let token = localStorage.getItem("cw_token");
-    
-    // Check for new token from server redirect
+
     const urlToken = urlParams.get('token');
-    
     if (urlToken) {
         token = urlToken;
-        
-        // 1. Save the new token immediately
         localStorage.setItem('cw_token', token);
-        
-        // 2. Clean the URL (prevents issues on refresh)
         window.history.replaceState({}, document.title, window.location.pathname); 
     }
 
     if (!token) {
-        // No token found, show the login button
         document.getElementById('auth-message').textContent = "Sign in to save progress";
         document.getElementById('discord-login-link').style.display = 'block';
         return;
     }
 
-    // 3. Verify token validity and fetch user data (including rank)
     document.getElementById('auth-message').textContent = "Restoring session...";
     try {
         const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
         const data = await res.json();
-        
         if (res.ok) {
-            showLoggedIn(data.user, token); // Show user data
+            showLoggedIn(data.user, token);
         } else {
-            logout(); // Token invalid or expired
+            logout();
         }
     } catch {
         document.getElementById('auth-message').textContent = "Offline or Session check failed.";
+    }
+} // <-- make sure this brace closes the function
 
-
-        // 2. Verify token validity with the server (and get rank data if needed)
-        document.getElementById('auth-message').textContent = "Restoring session...";
-        try {
-            const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
-            const data = await res.json();
-            
-            if (res.ok) {
-                showLoggedIn(data.user, token); // Data from server includes all rank info
-            } else {
-                logout(); // Token invalid or expired
-            }
-        } catch {
-            document.getElementById('auth-message').textContent = "Offline or Session check failed.";
+// Now define helpers OUTSIDE the function
+function injectUsername(name) {
+    localStorage.setItem("username", name);
+    setTimeout(() => {
+        const nativeInput = document.querySelector("username-input input");
+        const customElement = document.querySelector("username-input");
+        if (nativeInput) {
+            nativeInput.value = name;
+            nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
-    }
-    
-    // Unlocks the core game buttons by injecting the username
-    function injectUsername(name) {
-        localStorage.setItem("username", name);
-        setTimeout(() => {
-            const nativeInput = document.querySelector("username-input input");
-            const customElement = document.querySelector("username-input");
-            
-            if (nativeInput) {
-                nativeInput.value = name;
-                nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
-                nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
-        }, 500);
-    }
+        if (customElement) customElement.style.display = 'none';
+    }, 500);
+}
 
-    function logout() {
-        localStorage.removeItem("cw_token");
-        localStorage.removeItem("username");
-        location.reload();
-    }
+function logout() {
+    localStorage.removeItem("cw_token");
+    localStorage.removeItem("username");
+    location.reload();
+}
 
-    function observeGame() {
-        // Placeholder for win event listeners
-    }
+function observeGame() {
+    // Placeholder for win event listeners
+}
 
-    // Run on page load
-    window.addEventListener("load", function() {
-        requestAnimationFrame(() => document.documentElement.classList.remove("preload"));
-        handleAuthRedirect();
-    });
+window.addEventListener("load", function() {
+    requestAnimationFrame(() => document.documentElement.classList.remove("preload"));
+    handleAuthRedirect();
+});
+
     </script>
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee9b408fa25a13"}'></script>
 </body>
