@@ -1,61 +1,113 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full" translate="no">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>College Wars</title>
-<link rel="manifest" href="../../resources/manifest.json"><link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg">
-<link rel="canonical" href="https://collegewars.io/">
-<style>
-.preload *{transition:none !important}html{visibility:visible;opacity:1}html.preload{visibility:hidden;opacity:0}
-.bg-image{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;background-image:url("/images/EuropeBackgroundBlurred.webp");background-size:cover}
-.bg-image::before{content:"";position:absolute;width:100%;height:100vh;background:rgba(30,58,138,0.2)}
-.college-logo{font-family:'Arial Black',sans-serif;font-size:3rem;font-weight:900;text-transform:uppercase;background:linear-gradient(to bottom,#FFD700,#DAA520);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(2px 4px 6px rgba(0,0,0,0.5))}
-</style>
-<script>document.documentElement.className="preload";</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>College Wars</title>
+    <link rel="manifest" href="../../resources/manifest.json">
+    <link rel="icon" type="image/x-icon" href="../../resources/images/Favicon.svg">
+    <link rel="canonical" href="https://collegewarsio.com/">
+    <style>
+        .preload * { transition: none !important; }
+        html { visibility: visible; opacity: 1; }
+        html.preload { visibility: hidden; opacity: 0; }
+        .bg-image { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-image: url("/images/EuropeBackgroundBlurred.webp"); background-size: cover; }
+        .bg-image::before { content: ""; position: absolute; width: 100%; height: 100vh; background: rgba(30, 58, 138, 0.2); }
+        .college-logo { font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900; text-transform: uppercase; background: linear-gradient(to bottom, #FFD700, #DAA520); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5)); }
+        
+        /* Custom Styles for Discord Button Placement */
+        .discord-auth-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+    </style>
+    <script>document.documentElement.className = "preload";</script>
 </head>
 <body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
-<header class="l-header"><div class="l-header__content flex flex-col items-center justify-center">
-    <img src="./graphics/collegewars christmas logo 2.png" alt="CollegeWars Logo" class="w-auto h-64" style="margin-bottom: 5px;" />
-    <div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div>
-</div></header>
-<div class="bg-image"></div>
+    <header class="l-header">
+        <div class="l-header__content flex flex-col items-center justify-center">
+            <h1 class="college-logo">COLLEGE WARS</h1>
+            <div id="game-version" class="l-header__highlightText text-center text-white/80 font-bold">BETA V1.0</div>
+        </div>
+    </header>
+    <div class="bg-image"></div>
+    
+    <gutter-ads></gutter-ads>
 
-<gutter-ads></gutter-ads>
+    <main class="flex justify-center flex-grow">
+        <div class="container pt-12">
+            
+            <div class="discord-auth-container">
+                <div style="background-color: #36393f; padding: 20px; border-radius: 8px; width: 100%; max-width: 300px; text-align: center;">
+                    <h3 style="color: white; font-weight: bold; margin-bottom: 15px;">Secure Login</h3>
+                    
+                    <a 
+                        href="https://discord.com/api/oauth2/authorize?client_id=1445564774266966097&redirect_uri=https%3A%2F%2Fwww.collegewarsio.com%2Fapi%2Fdiscord%2Fcallback&response_type=code&scope=identify%20email"
+                        class="discord-login-button"
+                        style="display: block; padding: 12px; background-color: #5865F2; color: white; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 1em; transition: background 0.2s;"
+                    >
+                        Sign in with Discord
+                    </a>
+                    <p id="auth-status" style="margin-top: 10px; color: #BBB; font-size: 0.8em;">Connect to save your rank.</p>
+                </div>
+            </div>
 
-<main class="flex justify-center flex-grow">
-<div class="container pt-12">
-    <div id="rank-display" style="text-align: center; margin-bottom: 15px; color: white; font-size: 1.1em; font-weight: bold;">
-        Currently playing as Guest.
-    </div>
+            <div class="container__row" style="display: none;"> 
+                <flag-input class="w-[20%] md:w-[20%]"></flag-input>
+                <territory-patterns-modal class="w-[20%] md:w-[15%]">
+                    <button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center"></button>
+                </territory-patterns-modal>
+                <username-input class="relative w-full"></username-input>
+                <news-button class="w-[20%] component-hideable"></news-button>
+            </div>
+            
+            <div><public-lobby class="block"></public-lobby></div>
+            <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
+            <div class="container__row container__row--equal">
+                <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
+                <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
+            </div>
+            <o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button>
+            <o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
+            <div class="container__row"><lang-selector class="w-full"></lang-selector></div>
+        </div>
+    </main>
 
-    <div class="container__row">
-        <flag-input class="w-[20%] md:w-[20%]"></flag-input>
-        <territory-patterns-modal class="w-[20%] md:w-[15%]">
-            <button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center"></button>
-        </territory-patterns-modal>
-        <username-input class="relative w-full"></username-input>
-        <news-button class="w-[20%] component-hideable"></news-button>
-    </div>
-    <div><public-lobby class="block"></public-lobby></div>
-    <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
-    <div class="container__row container__row--equal">
-        <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
-        <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
-    </div>
-    <o-button id="single-player" title="Solo Study Mode" translationKey="main.single_player" block></o-button>
-    <o-button id="help-button" title="Syllabus" translationKey="main.instructions" block secondary></o-button>
-    <div class="container__row"><lang-selector class="w-full"></lang-selector></div>
-</div>
-</main>
-<button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
-<div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div>
-<div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
-<div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none"><div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none"><chat-display></chat-display><events-display></events-display></div><div style="pointer-events:auto"><control-panel></control-panel></div></div>
-<footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Discord</span></a></div><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
-<account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
-<div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
+    <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
+    <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div><div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div>
+    <div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none"><div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none"><chat-display></chat-display><events-display></events-display></div><div style="pointer-events:auto"><control-panel></control-panel></div></div>
+    <footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Discord</span></a></div><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
+    <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
+    <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
 
-<script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")})});</script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
+    <script>
+    // Function to handle the redirect from Discord
+    async function handleDiscordCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('code');
+
+        if (authCode) {
+            document.getElementById('auth-status').textContent = "Authenticating...";
+            // In Phase 3, the server will read the 'code' and exchange it for a token.
+            // For now, this confirms the code was received.
+            console.log("Discord code received:", authCode);
+
+            // Hide the Discord login button temporarily while auth happens
+            document.getElementById('discord-login-link').style.display = 'none';
+
+            // We will redirect the user back to the homepage without the code in the URL
+            // to prevent issues with repeated logins on refresh.
+            window.history.pushState({}, document.title, window.location.pathname);
+            
+            // *** NEXT STEP: Server will process the code via a backend route ***
+        }
+    }
+
+    window.addEventListener('load', handleDiscordCallback);
+    
+    window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")});});
+    </script>
 </body>
 </html>
