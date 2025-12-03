@@ -9,7 +9,7 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
-// --- NEW ACCOUNT IMPORTS ---
+// --- REQUIRED IMPORTS FOR DB/AUTH ---
 import { Pool } from "pg"; 
 import bcrypt from "bcryptjs"; 
 import jwt from "jsonwebtoken";
@@ -27,7 +27,9 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET || "INSECURE_FALLBACK_KEY"; // Ensures it's always a string
+// FIX: Reads JWT_SECRET from environment. Uses a fallback key for stability, 
+// but requires the environment variable to be set for security.
+const JWT_SECRET: string = process.env.JWT_SECRET || "INSECURE_FALLBACK_KEY"; 
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -63,7 +65,6 @@ async function initDB(): Promise<void> {
         discord_id VARCHAR(255) UNIQUE, 
         username VARCHAR(50), 
         email VARCHAR(255) UNIQUE, 
-        password_hash VARCHAR(255), 
         wins INT DEFAULT 0,
         games_played INT DEFAULT 0,
         rank_tier VARCHAR(50) DEFAULT 'UNRANKED', 
@@ -98,8 +99,9 @@ const app = express();
 const server = http.createServer(app);
 const log = logger.child({ comp: "m" });
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = path.join(process.cwd(), 'src', 'server', 'Master.ts'); 
 const __dirname = path.dirname(__filename);
+
 
 // --- Middleware ---
 app.use(express.json());
@@ -223,199 +225,4 @@ export async function startMaster() {
   // --- CRASH FIX: Hardcode Workers to 1 ---
   const NUM_WORKERS = 1;
 
-  log.info(`Primary ${process.pid} is running`);
-  log.info(`Setting up ${NUM_WORKERS} workers...`);
-
-  for (let i = 0; i < NUM_WORKERS; i++) {
-    const worker = cluster.fork({ WORKER_ID: i });
-    log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
-  }
-
-  cluster.on("message", (worker, message) => {
-    if (message.type === "WORKER_READY") {
-      const workerId = message.workerId;
-      readyWorkers.add(workerId);
-      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
-
-      if (readyWorkers.size === NUM_WORKERS) {
-        log.info("All workers ready, starting game scheduling");
-        const scheduleLobbies = () => {
-          schedulePublicGame(playlist).catch((error) => {
-            log.error("Error scheduling public game:", error);
-          });
-        };
-        setInterval(() => {
-          fetchLobbies().then((lobbies) => {
-            if (lobbies === 0) scheduleLobbies();
-          });
-        }, 100);
-      }
-    }
-  });
-
-  cluster.on("exit", (worker, code, signal) => {
-    const workerId = (worker as any).process?.env?.WORKER_ID;
-    if (workerId) cluster.fork({ WORKER_ID: workerId });
-  });
-
-  const PORT = parseInt(process.env.PORT || "3000");
-  const HOST = "0.0.0.0";
-  server.listen(PORT, HOST, () => {
-    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
-  });
-}
-
-// --- Routes ---
-
-app.post("/api/report-game", async (req, res) => {
-  // NOTE: This route assumes the client securely sends a user token and the game result.
-  const { userId, result } = req.body; 
-
-  if (!userId || !["win", "loss"].includes(result)) {
-    return res.status(400).send("Invalid request");
-  }
-
-  try {
-    // 1. Fetch current stats
-    const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
-    if (userRes.rows.length === 0) {
-      return res.status(404).send("User not found");
-    }
-
-    let currentXP = userRes.rows[0].rank_xp;
-    let wins = userRes.rows[0].wins;
-    let gamesPlayed = userRes.rows[0].games_played;
-
-    // 2. Calculate new stats
-    const baseXP = 50;
-    const winBonus = result === "win" ? 100 : 0;
-    const totalXP = baseXP + winBonus;
-
-    currentXP += totalXP;
-    wins += (result === "win" ? 1 : 0);
-    gamesPlayed += 1;
-
-    // 3. Calculate new tier
-    const newTier = getRankTier(currentXP);
-
-    // 4. Save back to DB
-    await db.query(
-      "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
-      [currentXP, newTier, wins, gamesPlayed, userId]
-    );
-
-    res.json({ userId, rank_xp: currentXP, rank_tier: newTier, wins, games_played: gamesPlayed });
-  } catch (err) {
-    logger.error("Error updating rank:", err);
-    res.status(500).send("Internal server error");
-  }
-});
-
-app.get("/api/discord/callback", async (req, res) => {
-    const authCode = req.query.code as string;
-    
-    if (!authCode) {
-        return res.status(400).send("Discord authentication code missing.");
-    }
-    
-    const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-    const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-    const REDIRECT_URI = "https://www.collegewarsio.com/api/discord/callback"; // Must match your Discord App setting
-
-    if (!CLIENT_ID || !CLIENT_SECRET) {
-        log.error("Missing Discord credentials in environment variables.");
-        return res.status(500).send("Server configuration error.");
-    }
-
-    try {
-        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code: authCode,
-                redirect_uri: REDIRECT_URI,
-            }),
-        });
-
-        const tokenData = await tokenResponse.json();
-
-        if (tokenData.error) {
-            log.error("Discord token exchange failed:", tokenData.error_description);
-            return res.status(401).send("Authentication failed: " + tokenData.error_description);
-        }
-
-        const accessToken = tokenData.access_token;
-
-        const userResponse = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                authorization: `Bearer ${accessToken}`,
-            },
-        });
-        
-        const userData = await userResponse.json();
-        const discordId = userData.id;
-        const username = userData.username;
-
-        let userResult = await db.query("SELECT * FROM users WHERE discord_id = $1", [discordId]);
-
-        if (userResult.rows.length === 0) {
-            userResult = await db.query(
-                "INSERT INTO users (discord_id, username, email) VALUES ($1, $2, $3) RETURNING id, username, wins, rank_tier, rank_xp",
-                [discordId, username, userData.email || ''] 
-            );
-        }
-
-        const user = userResult.rows[0];
-        const sessionToken = jwt.sign({ id: user.id }, JWT_SECRET || 'fallback_secret_key');
-
-        res.redirect(`/?token=${sessionToken}`); // Only pass the essential token
-
-    } catch (error) {
-        log.error("Error during Discord OAuth flow:", error);
-        res.status(500).send("Server error during login process.");
-    }
-});
-
-
-app.get("/api/env", async (req, res) => {
-  const envConfig = { game_env: process.env.GAME_ENV };
-  if (!envConfig.game_env) return res.sendStatus(500);
-  res.json(envConfig);
-});
-
-app.get("/api/public_lobbies", async (req, res) => {
-  res.send(publicLobbiesJsonStr);
-});
-
-app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
-  if (req.headers[config.adminHeader()] !== config.adminToken()) {
-    return res.status(401).send("Unauthorized");
-  }
-  const { gameID, clientID } = req.params;
-  if (!ID.safeParse(gameID).success || !ID.safeParse(clientID).success) {
-    res.sendStatus(400);
-    return;
-  }
-  try {
-    const response = await fetch(
-      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
-      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to kick player: ${response.statusText}`);
-    }
-    res.sendStatus(200);
-  } catch (error) {
-    log.error(`Error kicking player from game ${gameID}:`, error);
-    res.sendStatus(500);
-  }
-});
-
-app.get("*", function (req, res) {
-  res.sendFile(path.join(__dirname, "../../static/index.html"));
-});
+  log.info(`Primary ${process.pid} is running
