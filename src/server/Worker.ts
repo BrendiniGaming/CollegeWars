@@ -56,6 +56,54 @@ export async function startWorker() {
   const app = express();
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
+// --- Discord OAuth callback ---
+app.get("/api/discord/callback", async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) {
+    return res.status(400).send("Missing code");
+  }
+
+  try {
+    // Step 1: Exchange code for access token
+    const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.DISCORD_CLIENT_ID!,
+        client_secret: process.env.DISCORD_CLIENT_SECRET!,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: "https://www.collegewarsio.com/api/discord/callback",
+      }),
+    });
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      return res.status(400).send("Failed to get access token");
+    }
+
+    // Step 2: Fetch Discord user
+    const userResponse = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const discordUser = await userResponse.json();
+
+    // Step 3: Create your own session token
+    const sessionToken = jwt.sign(
+      { id: discordUser.id, username: discordUser.username },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    // Step 4: Redirect back to front‑end with ?token=...
+    res.redirect(
+      `/?token=${sessionToken}&username=${encodeURIComponent(discordUser.username)}`
+    );
+  } catch (err) {
+    console.error("Discord OAuth error:", err);
+    res.status(500).send("OAuth failed");
+  }
+});
 
   const gm = new GameManager(config, log);
 
