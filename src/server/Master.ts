@@ -9,8 +9,11 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
-// --- NEW IMPORT FOR DB ---
+// --- NEW ACCOUNT IMPORTS ---
 import { Pool } from "pg"; 
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { URLSearchParams } from 'url';
 
 const config = getServerConfigFromServer();
 
@@ -19,11 +22,12 @@ const config = getServerConfigFromServer();
 config.numWorkers = () => 1;
 // ---------------------------------------------------------------
 
-// --- DATABASE CONNECTION & AUTH ---
+// --- DATABASE CONNECTION & AUTH SETUP ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
+const JWT_SECRET = "CollegeWarsSecretKey123";
 
 // --- Rank System Definitions (9 Tiers) ---
 const TIER_ORDER = [
@@ -65,36 +69,24 @@ function getRankTier(xp: number): string {
 }
 // ---------------------------------------
 
-// --- Database Init Function (Automated Migration) ---
 async function initDB(): Promise<void> {
   try {
-    // NOTE: If you are getting build errors, ensure all the required packages (pg, bcryptjs, jsonwebtoken) are in package.json
-    // 1. Ensure the base users table exists
+    // 1. Ensure the base users table exists (using Discord ID for primary identity)
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE, 
-        email VARCHAR(255) UNIQUE, 
-        password_hash VARCHAR(255), 
+        discord_id VARCHAR(255) UNIQUE, 
+        username VARCHAR(50), 
+        email VARCHAR(255), 
         wins INT DEFAULT 0,
         games_played INT DEFAULT 0,
+        rank_tier VARCHAR(50) DEFAULT 'UNRANKED', 
+        rank_xp INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     
-    // 2. ADD RANK COLUMNS (If they don't exist - ensures rank system works)
-    await db.query(`
-      DO $$ 
-      BEGIN
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_tier') THEN
-              ALTER TABLE users ADD COLUMN rank_tier VARCHAR(50) DEFAULT 'UNRANKED';
-          END IF;
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_xp') THEN
-              ALTER TABLE users ADD COLUMN rank_xp INTEGER DEFAULT 0;
-          END IF;
-      END $$;
-    `);
-
+    // NOTE: Old migration columns (like password_hash) are removed to simplify Discord auth.
     logger.info("Database initialized: User and Rank tables are ready.");
   } catch (err) {
     logger.error("Database initialization failed:", err);
@@ -138,53 +130,7 @@ app.use(rateLimit({ windowMs: 1000, max: 20 }));
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- Rank Route ---
-
-app.post("/api/report-game", async (req, res) => {
-  // NOTE: This route assumes the client sends a verified 'userId' and 'result'. 
-  const { userId, result } = req.body; // result = "win" or "loss"
-
-  if (!userId || !["win", "loss"].includes(result)) {
-    return res.status(400).send("Invalid request");
-  }
-
-  try {
-    // 1. Fetch current stats
-    const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
-    if (userRes.rows.length === 0) {
-      return res.status(404).send("User not found");
-    }
-
-    let currentXP = userRes.rows[0].rank_xp;
-    let wins = userRes.rows[0].wins;
-    let gamesPlayed = userRes.rows[0].games_played;
-
-    // 2. Calculate new stats
-    const baseXP = 50;
-    const winBonus = result === "win" ? 100 : 0;
-    const totalXP = baseXP + winBonus;
-
-    currentXP += totalXP;
-    wins += (result === "win" ? 1 : 0);
-    gamesPlayed += 1;
-
-    // 3. Calculate new tier
-    const newTier = getRankTier(currentXP);
-
-    // 4. Save back to DB
-    await db.query(
-      "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
-      [currentXP, newTier, wins, gamesPlayed, userId]
-    );
-
-    res.json({ userId, rank_xp: currentXP, rank_tier: newTier, wins, games_played: gamesPlayed });
-  } catch (err) {
-    logger.error("Error updating rank:", err);
-    res.status(500).send("Internal server error");
-  }
-});
-
-// --- Helper Functions (Standard Game Logic) ---
+// --- Main Game Helpers ---
 
 async function schedulePublicGame(playlist: MapPlaylist) {
   const gameID = generateID();
@@ -323,7 +269,89 @@ export async function startMaster() {
   });
 }
 
-// --- Routes ---
+// --- NEW DISCORD CALLBACK ROUTE ---
+
+app.get("/api/discord/callback", async (req, res) => {
+    const authCode = req.query.code as string;
+    
+    if (!authCode) {
+        return res.status(400).send("Discord authentication code missing.");
+    }
+    
+    // 1. Get Client ID and Secret securely from environment variables
+    // NOTE: Ensure DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET are set in Railway Variables
+    const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+    const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+    const REDIRECT_URI = "https://www.collegewarsio.com/api/discord/callback"; // Must match your Discord App setting
+
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+        log.error("Missing Discord credentials in environment variables.");
+        return res.status(500).send("Server configuration error.");
+    }
+
+    try {
+        // 2. Exchange the temporary code for an Access Token
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: authCode,
+                redirect_uri: REDIRECT_URI,
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.error) {
+            log.error("Discord token exchange failed:", tokenData.error_description);
+            return res.status(401).send("Authentication failed: " + tokenData.error_description);
+        }
+
+        const accessToken = tokenData.access_token;
+
+        // 3. Use the Access Token to get User Data (ID, Email, Username)
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                authorization: `Bearer ${accessToken}`,
+            },
+        });
+        
+        const userData = await userResponse.json();
+        const discordId = userData.id;
+        const username = userData.username;
+
+        // --- 4. Database Logic (Create/Login) ---
+        let userResult = await db.query("SELECT * FROM users WHERE discord_id = $1", [discordId]);
+
+        if (userResult.rows.length === 0) {
+            // User does not exist, create new one
+            userResult = await db.query(
+                "INSERT INTO users (discord_id, username, email) VALUES ($1, $2, $3) RETURNING id, username, wins, rank_tier, rank_xp",
+                [discordId, username, userData.email || ''] // Use email from Discord if provided
+            );
+        }
+
+        const user = userResult.rows[0];
+
+        // 5. Issue Game Session Token (JWT)
+        const sessionToken = jwt.sign({ id: user.id }, JWT_SECRET);
+
+        // Redirect back to the main game page with the token
+        res.redirect(`/?token=${sessionToken}&username=${user.username}`);
+
+    } catch (error) {
+        log.error("Error during Discord OAuth flow:", error);
+        res.status(500).send("Server error during login process.");
+    }
+});
+
+
+// --- Standard Routes ---
 
 app.get("/api/env", async (req, res) => {
   const envConfig = { game_env: process.env.GAME_ENV };
