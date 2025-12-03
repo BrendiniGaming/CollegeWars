@@ -26,7 +26,7 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET: string = process.env.JWT_SECRET as string; // Forces type, or crash if missing
 
 // --- Rank System Definitions ---
 const TIER_ORDER = [
