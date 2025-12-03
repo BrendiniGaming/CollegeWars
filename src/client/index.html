@@ -34,7 +34,6 @@
         }
     </style>
     <script>document.documentElement.className = "preload";</script>
-<link rel="stylesheet" href="./index.css" />
 </head>
 <body class="h-full select-none font-sans min-h-screen bg-opacity-0 bg-cover bg-center bg-fixed flex flex-col">
     <header class="l-header">
@@ -87,106 +86,112 @@
 
     <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
     <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div><div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div><div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none"><div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none"><chat-display></chat-display><events-display></events-display></div><div style="pointer-events:auto"><control-panel></control-panel></div></div>
-    <footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
+    <footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Discord</span></a></div><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
     <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
     <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
 
-<script>
-// --- GLOBAL UTILITY ---
-function getRankIconPath(rankTier) {
-    return `/resources/images/ranks/rank_${rankTier.toLowerCase()}.png`;
-}
-
-// --- DISCORD CLIENT SETUP ---
-const CLIENT_ID = '1445564774266966097'; // <-- FIXED: Using the actual ID
-const REDIRECT_URI = 'https://www.collegewarsio.com/api/discord/callback'; 
-
-function redirectToDiscord() {
-    const scope = 'identify email'; 
-    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
-    window.location.href = authUrl;
-}
-
-// Shows user stats and unlocks the game buttons
-function showLoggedIn(user, token) {
-    // Hide login elements
-    document.getElementById('discord-login-link').style.display = 'none';
-    document.getElementById('logout-button').style.display = 'block';
-
-    document.getElementById('auth-info').innerHTML = 
-        `<img src="${getRankIconPath(user.rank_tier)}" alt="${user.rank_tier}" class="rank-icon">` + 
-        `Welcome, <span style="color:#93C5FD; font-weight:bold;">${user.username}</span><br>` +
-        `Tier: <span style="color:#4ADE80; font-weight:bold;">${user.rank_tier}</span> | Wins: ${user.wins}`;
-    
-    // Save token and username for persistence
-    localStorage.setItem('cw_token', token);
-    localStorage.setItem('username', user.username);
-    
-    // CRITICAL: Unlock the game buttons
-    injectUsername(user.username);
-    observeGame();
-}
-
-// Unlocks the core game buttons by injecting the username
-function injectUsername(name) {
-    localStorage.setItem("username", name);
-    setTimeout(() => {
-        const nativeInput = document.querySelector("username-input input");
-        const customElement = document.querySelector("username-input");
-        
-        if (nativeInput) {
-            nativeInput.value = name;
-            nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
-            nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    <script>
+        // Global utility to get rank icon path
+        function getRankIconPath(rankTier) {
+            // NOTE: Must ensure this directory exists and your 9 icons are named correctly
+            return `/resources/images/ranks/rank_${rankTier.toLowerCase()}.png`;
         }
-        if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
-    }, 500);
-}
 
-function logout() {
-    localStorage.removeItem("cw_token");
-    localStorage.removeItem("username");
-    location.reload();
-}
-
-// Checks for token in URL or LocalStorage and verifies session
-async function handleAuthRedirect() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let token = localStorage.getItem("cw_token");
-    
-    // 1. Handle redirect from server (new token in URL)
-    const newToken = urlParams.get('token');
-    if (newToken) {
-        token = newToken;
-        // Clean the URL (prevents issues on refresh)
-        window.history.replaceState({}, document.title, window.location.pathname); 
-    }
-
-    if (!token) {
-        document.getElementById('auth-message').textContent = "Sign in to save progress";
-        document.getElementById('discord-login-link').style.display = 'block';
-        return;
-    }
-
-    // 2. Verify token validity with the server (and get rank data)
-    document.getElementById('auth-message').textContent = "Restoring session...";
-    try {
-        const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
-        const data = await res.json();
-        
-        if (res.ok) {
-            showLoggedIn(data.user, token);
-        } else {
-            logout(); // Token invalid or expired
+        // Function to initiate the login process
+        function redirectToDiscord() {
+            const clientId = '1445564774266966097'; // Your Client ID
+            const redirectUri = 'https://www.collegewarsio.com/api/discord/callback'; // Your Redirect URI
+            const scope = 'identify email'; // Permissions requested
+            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+            window.location.href = authUrl;
         }
-    } catch {
-        document.getElementById('auth-message').textContent = "Offline or Session check failed.";
-    }
-}
 
-function observeGame() { /* Placeholder for win event listeners */ }
-async function reportWin() { /* Server communication for win/loss */ }
+        // Shows user stats and unlocks the game buttons
+        function showLoggedIn(user, token) {
+            // Hide login elements
+            document.getElementById('discord-login-link').style.display = 'none';
+            document.getElementById('logout-button').style.display = 'block';
 
-// --- INITIALIZE ---
-document.addEventListener('DOMContentLoaded', handleAuthRedirect);
-</script>
+            document.getElementById('auth-info').innerHTML = 
+                `<img src="${getRankIconPath(user.rank_tier)}" alt="${user.rank_tier}" class="rank-icon">` + 
+                `Welcome, <span style="color:#93C5FD; font-weight:bold;">${user.username}</span><br>` +
+                `Tier: <span style="color:#4ADE80; font-weight:bold;">${user.rank_tier}</span> | Wins: ${user.wins}`;
+            
+            // Save token and username to LocalStorage for persistence
+            localStorage.setItem('cw_token', token);
+            localStorage.setItem('username', user.username);
+            
+            // CRITICAL: Unlock the game buttons
+            injectUsername(user.username);
+            observeGame();
+        }
+
+        // Checks for token in URL or LocalStorage and verifies session
+        async function handleAuthRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = localStorage.getItem("cw_token");
+            
+            // 1. Handle redirect from server (new token in URL)
+            const newToken = urlParams.get('token');
+            if (newToken) {
+                token = newToken;
+                // Clean the URL (prevents issues on refresh)
+                window.history.replaceState({}, document.title, window.location.pathname); 
+            }
+
+            if (!token) {
+                document.getElementById('auth-message').textContent = "Sign in to save progress";
+                document.getElementById('discord-login-link').style.display = 'block';
+                return;
+            }
+
+            // 2. Verify token validity with the server (and get rank data)
+            document.getElementById('auth-message').textContent = "Restoring session...";
+            try {
+                const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showLoggedIn(data.user, token);
+                } else {
+                    logout(); // Token invalid or expired
+                }
+            } catch {
+                document.getElementById('auth-message').textContent = "Offline or Session check failed.";
+            }
+        }
+        
+        // Unlocks the core game buttons by injecting the username
+        function injectUsername(name) {
+            localStorage.setItem("username", name);
+            setTimeout(() => {
+                const nativeInput = document.querySelector("username-input input");
+                const customElement = document.querySelector("username-input");
+                
+                if (nativeInput) {
+                    nativeInput.value = name;
+                    nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
+            }, 500);
+        }
+
+        function logout() {
+            localStorage.removeItem("cw_token");
+            localStorage.removeItem("username");
+            location.reload();
+        }
+
+        function observeGame() {
+            // Placeholder for win event listeners
+        }
+
+        window.addEventListener("load",function(){
+            requestAnimationFrame(() => document.documentElement.classList.remove("preload"));
+            handleAuthRedirect();
+        });
+    </script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee9b408fa25a13"}'></script>
+</body>
+</html>
