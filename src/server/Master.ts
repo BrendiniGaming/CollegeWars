@@ -10,8 +10,10 @@ import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 // --- REQUIRED IMPORTS FOR DB/AUTH ---
-import { Pool } from "pg";  
-import { URLSearchParams } from 'url'
+import { Pool } from "pg"; 
+import bcrypt from "bcryptjs"; 
+import jwt from "jsonwebtoken";
+import { URLSearchParams } from 'url';
 
 const config = getServerConfigFromServer();
 
@@ -23,10 +25,9 @@ config.numWorkers = () => 1;
 // --- DATABASE CONNECTION & AUTH VARIABLES ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: { rejectUnauthorized: false } // SIMPLIFIED SSL FIX
 });
-// FIX: Ensures JWT_SECRET is always a string, falling back if ENV is empty
-const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; 
+const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890";
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -226,7 +227,7 @@ export async function startMaster() {
   log.info(`Setting up ${NUM_WORKERS} workers...`);
 
   for (let i = 0; i < NUM_WORKERS; i++) {
-    const worker = cluster.fork({ WORKER_ID: i });
+    const worker = cluster.fork({ WORKR_ID: i });
     log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
   }
 
@@ -253,7 +254,7 @@ export async function startMaster() {
   });
 
   cluster.on("exit", (worker, code, signal) => {
-    const workerId = (worker as any).process?.env?.WORKER_ID;
+    const workerId = (worker as any).process?.env?.WORKR_ID;
     if (workerId) cluster.fork({ WORKR_ID: workerId });
   });
 
@@ -266,7 +267,6 @@ export async function startMaster() {
 // --- Routes ---
 
 app.post("/api/report-game", async (req, res) => {
-  // NOTE: This route assumes the client securely sends a user token and the game result.
   const { userId, result } = req.body; 
 
   if (!userId || !["win", "loss"].includes(result)) {
@@ -274,7 +274,6 @@ app.post("/api/report-game", async (req, res) => {
   }
 
   try {
-    // 1. Fetch current stats
     const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
       return res.status(404).send("User not found");
@@ -284,7 +283,6 @@ app.post("/api/report-game", async (req, res) => {
     let wins = userRes.rows[0].wins;
     let gamesPlayed = userRes.rows[0].games_played;
 
-    // 2. Calculate new stats
     const baseXP = 50;
     const winBonus = result === "win" ? 100 : 0;
     const totalXP = baseXP + winBonus;
@@ -293,10 +291,8 @@ app.post("/api/report-game", async (req, res) => {
     wins += (result === "win" ? 1 : 0);
     gamesPlayed += 1;
 
-    // 3. Calculate new tier
     const newTier = getRankTier(currentXP);
 
-    // 4. Save back to DB
     await db.query(
       "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
       [currentXP, newTier, wins, gamesPlayed, userId]
@@ -329,24 +325,4 @@ app.get("/api/discord/callback", async (req, res) => {
         const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code: authCode,
-                redirect_uri: REDIRECT_URI,
-            }),
-        });
-
-        const tokenData = await tokenResponse.json();
-
-        if (tokenData.error) {
-            log.error("Discord token exchange failed:", tokenData.error_description);
-            return res.status(401).send("Authentication failed: " + tokenData.error_description);
-        }
-
-        const accessToken = tokenData.access_token;
-
-        const userResponse = await fetch('
+                'Content-Type': 'application/
