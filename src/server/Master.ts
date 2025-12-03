@@ -76,20 +76,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Database Init Function (Automated Migration) ---
-async function initDB(): Promise<void> {
+async function // --- FUNCTION TO CREATE TABLE AND ADD RANK COLUMNS ---
+
+async function initDB() {
   try {
     // 1. Ensure the base users table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE, 
-        email VARCHAR(255) UNIQUE, 
-        password_hash VARCHAR(255), 
+        username VARCHAR(50) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
         wins INT DEFAULT 0,
         games_played INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // 2. ADD RANK COLUMNS (If they don't exist yet - this is safe to run multiple times)
+    await db.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_tier') THEN
+              ALTER TABLE users ADD COLUMN rank_tier VARCHAR(50) DEFAULT 'UNRANKED';
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_xp') THEN
+              ALTER TABLE users ADD COLUMN rank_xp INTEGER DEFAULT 0;
+          END IF;
+      END $$;
+    `);
+
+    logger.info("Database initialized: Rank columns verified/added.");
+  } catch (err) {
+    logger.error("Database initialization failed:", err);
+  }
+}
     
     // 2. ADD RANK COLUMNS (If they don't exist yet - using DO $$ block for safety)
     await db.query(`
