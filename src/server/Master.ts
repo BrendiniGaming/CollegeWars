@@ -9,6 +9,8 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
+// --- NEW IMPORT FOR DATABASE ---
+import { Pool } from "pg"; 
 
 const config = getServerConfigFromServer();
 
@@ -16,6 +18,47 @@ const config = getServerConfigFromServer();
 // @ts-ignore
 config.numWorkers = () => 1;
 // ---------------------------------------------------------------
+
+// --- DATABASE CONNECTION & SETUP ---
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+async function initDB(): Promise<void> {
+  try {
+    // 1. Ensure the base users table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE, 
+        email VARCHAR(255) UNIQUE, 
+        password_hash VARCHAR(255), 
+        wins INT DEFAULT 0,
+        games_played INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // 2. ADD RANK COLUMNS (If they don't exist - this is safe SQL migration block)
+    await db.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_tier') THEN
+              ALTER TABLE users ADD COLUMN rank_tier VARCHAR(50) DEFAULT 'UNRANKED';
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_xp') THEN
+              ALTER TABLE users ADD COLUMN rank_xp INTEGER DEFAULT 0;
+          END IF;
+      END $$;
+    `);
+
+    logger.info("Database initialized: User and Rank tables are ready.");
+  } catch (err) {
+    logger.error("Database initialization failed:", err);
+  }
+}
+// ----------------------------------------------------------------
 
 const playlist = new MapPlaylist();
 const readyWorkers = new Set();
@@ -144,6 +187,9 @@ export async function startMaster() {
   if (!cluster.isPrimary) {
     throw new Error("startMaster() should only be called in the primary process");
   }
+
+  // Initialize DB tables and rank columns
+  await initDB(); 
 
   // --- CRASH FIX: Hardcode Workers to 1 ---
   const NUM_WORKERS = 1;
