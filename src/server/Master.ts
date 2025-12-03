@@ -29,7 +29,7 @@ const db = new Pool({
 });
 // FIX: Reads JWT_SECRET from environment. Uses a fallback key for stability, 
 // but requires the environment variable to be set for security.
-const JWT_SECRET: string = process.env.JWT_SECRET || "INSECURE_FALLBACK_KEY"; 
+const JWT_SECRET: string = process.env.DISCORD_CLIENT_SECRET || "INSECURE_FALLBACK"; 
 // --------------------------------------------
 
 // --- Rank System Definitions ---
