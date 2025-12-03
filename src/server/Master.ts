@@ -14,6 +14,7 @@ import { Pool } from "pg";
 import bcrypt from "bcryptjs"; 
 import jwt from "jsonwebtoken";
 import { URLSearchParams } from 'url';
+// ------------------------------------
 
 const config = getServerConfigFromServer();
 
@@ -27,10 +28,10 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET = process.env.JWT_SECRET; // READ FROM ENV
+const JWT_SECRET = process.env.JWT_SECRET; // Read from ENV
 // --------------------------------------------
 
-// --- Rank System Definitions ---
+// --- Rank System Definitions (9 Tiers) ---
 const TIER_ORDER = [
   "UNRANKED", "BRONZE", "SILVER", "GOLD", "PLATINUM", "CHAMPION", "GRAND_CHAMPION", 
   "HEROIC_CHAMPION", "MASTER_CHAMPION", "MASTERS",
