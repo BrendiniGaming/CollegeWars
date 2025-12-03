@@ -126,27 +126,46 @@
         observeGame();
     }
 
-    // Checks for token in URL or LocalStorage and verifies session
-    async function handleAuthRedirect() {
-        const urlParams = new URLSearchParams(window.location.search);
-        let token = localStorage.getItem("cw_token");
+    // --- CRITICAL FIX: Robust URL Parsing ---
+async function handleAuthRedirect() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let token = localStorage.getItem("cw_token");
+    
+    // Check for new token from server redirect
+    const urlToken = urlParams.get('token');
+    
+    if (urlToken) {
+        token = urlToken;
         
-        // 1. Handle redirect from server (NEW: Read token and profile data directly from URL)
-        const urlToken = urlParams.get('token');
-        const urlUsername = urlParams.get('username');
-        const urlRank = urlParams.get('rankTier');
-        const urlWins = urlParams.get('wins');
+        // 1. Save the new token immediately
+        localStorage.setItem('cw_token', token);
+        
+        // 2. Clean the URL (prevents issues on refresh)
+        window.history.replaceState({}, document.title, window.location.pathname); 
+    }
 
-        if (urlToken) {
-            token = urlToken;
-            
-            // If data is in URL, immediately display and clean URL
-            if (urlUsername && urlRank) {
-                showLoggedIn({ username: urlUsername, rank_tier: urlRank, wins: urlWins }, token);
-                
-                // Clean the URL (prevents issues on refresh)
-                window.history.replaceState({}, document.title, window.location.pathname);
-                return; // Stop here, session is now active
+    if (!token) {
+        // No token found, show the login button
+        document.getElementById('auth-message').textContent = "Sign in to save progress";
+        document.getElementById('discord-login-link').style.display = 'block';
+        return;
+    }
+
+    // 3. Verify token validity and fetch user data (including rank)
+    document.getElementById('auth-message').textContent = "Restoring session...";
+    try {
+        const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showLoggedIn(data.user, token); // Show user data
+        } else {
+            logout(); // Token invalid or expired
+        }
+    } catch {
+        document.getElementById('auth-message').textContent = "Offline or Session check failed.";
+    }
+}
             }
         }
 
