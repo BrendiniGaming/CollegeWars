@@ -10,10 +10,8 @@ import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 // --- REQUIRED IMPORTS FOR DB/AUTH ---
-import { Pool } from "pg"; 
-import bcrypt from "bcryptjs"; 
-import jwt from "jsonwebtoken";
-import { URLSearchParams } from 'url';
+import { Pool } from "pg";  
+import { URLSearchParams } from 'url'
 
 const config = getServerConfigFromServer();
 
