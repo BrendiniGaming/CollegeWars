@@ -90,107 +90,119 @@
     <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
     <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
 
-    <script>
-        // Global utility to get rank icon path
-        function getRankIconPath(rankTier) {
-            // NOTE: Must ensure this directory exists and your 9 icons are named correctly
-            return `/resources/images/ranks/rank_${rankTier.toLowerCase()}.png`;
-        }
+<script>
+    // --- GLOBAL UTILITY ---
+    function getRankIconPath(rankTier) {
+        // NOTE: Must ensure this directory exists and your 9 icons are named correctly
+        return `/resources/images/ranks/rank_${rankTier.toLowerCase()}.png`;
+    }
 
-        // Function to initiate the login process
-        function redirectToDiscord() {
-            const clientId = '1445564774266966097'; // Your Client ID
-            const redirectUri = 'https://www.collegewarsio.com/api/discord/callback'; // Your Redirect URI
-            const scope = 'identify email'; // Permissions requested
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
-            window.location.href = authUrl;
-        }
-
-        // Shows user stats and unlocks the game buttons
-        function showLoggedIn(user, token) {
-            // Hide login elements
-            document.getElementById('discord-login-link').style.display = 'none';
-            document.getElementById('logout-button').style.display = 'block';
-
-            document.getElementById('auth-info').innerHTML = 
-                `<img src="${getRankIconPath(user.rank_tier)}" alt="${user.rank_tier}" class="rank-icon">` + 
-                `Welcome, <span style="color:#93C5FD; font-weight:bold;">${user.username}</span><br>` +
-                `Tier: <span style="color:#4ADE80; font-weight:bold;">${user.rank_tier}</span> | Wins: ${user.wins}`;
-            
-            // Save token and username to LocalStorage for persistence
-            localStorage.setItem('cw_token', token);
-            localStorage.setItem('username', user.username);
-            
-            // CRITICAL: Unlock the game buttons
-            injectUsername(user.username);
-            observeGame();
-        }
-
-        // Checks for token in URL or LocalStorage and verifies session
-        async function handleAuthRedirect() {
-            const urlParams = new URLSearchParams(window.location.search);
-            let token = localStorage.getItem("cw_token");
-            
-            // 1. Handle redirect from server (new token in URL)
-            const newToken = urlParams.get('token');
-            if (newToken) {
-                token = newToken;
-                // Clean the URL (prevents issues on refresh)
-                window.history.replaceState({}, document.title, window.location.pathname); 
-            }
-
-            if (!token) {
-                document.getElementById('auth-message').textContent = "Sign in to save progress";
-                document.getElementById('discord-login-link').style.display = 'block';
-                return;
-            }
-
-            // 2. Verify token validity with the server (and get rank data)
-            document.getElementById('auth-message').textContent = "Restoring session...";
-            try {
-                const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    showLoggedIn(data.user, token);
-                } else {
-                    logout(); // Token invalid or expired
-                }
-            } catch {
-                document.getElementById('auth-message').textContent = "Offline or Session check failed.";
-            }
-        }
+    // --- DISCORD AUTHENTICATION ---
+    function redirectToDiscord() {
+        const clientId = '1445564774266966097'; 
+        const redirectUri = 'https://www.collegewarsio.com/api/discord/callback';
+        const scope = 'identify email'; 
         
-        // Unlocks the core game buttons by injecting the username
-        function injectUsername(name) {
-            localStorage.setItem("username", name);
-            setTimeout(() => {
-                const nativeInput = document.querySelector("username-input input");
-                const customElement = document.querySelector("username-input");
+        const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+        window.location.href = authUrl;
+    }
+
+    // Shows user stats and unlocks the game buttons
+    function showLoggedIn(user, token) {
+        document.getElementById('discord-login-link').style.display = 'none';
+        document.getElementById('logout-button').style.display = 'block';
+
+        document.getElementById('auth-info').innerHTML = 
+            `<img src="${getRankIconPath(user.rank_tier)}" alt="${user.rank_tier}" class="rank-icon">` + 
+            `Welcome, <span style="color:#93C5FD; font-weight:bold;">${user.username}</span><br>` +
+            `Tier: <span style="color:#4ADE80; font-weight:bold;">${user.rank_tier}</span> | Wins: ${user.wins}`;
+        
+        // Save token and username to LocalStorage for persistence
+        localStorage.setItem('cw_token', token);
+        localStorage.setItem('username', user.username);
+        
+        // CRITICAL: Unlock the game buttons
+        injectUsername(user.username);
+        observeGame();
+    }
+
+    // Checks for token in URL or LocalStorage and verifies session
+    async function handleAuthRedirect() {
+        const urlParams = new URLSearchParams(window.location.search);
+        let token = localStorage.getItem("cw_token");
+        
+        // 1. Handle redirect from server (NEW: Read token and profile data directly from URL)
+        const urlToken = urlParams.get('token');
+        const urlUsername = urlParams.get('username');
+        const urlRank = urlParams.get('rankTier');
+        const urlWins = urlParams.get('wins');
+
+        if (urlToken) {
+            token = urlToken;
+            
+            // If data is in URL, immediately display and clean URL
+            if (urlUsername && urlRank) {
+                showLoggedIn({ username: urlUsername, rank_tier: urlRank, wins: urlWins }, token);
                 
-                if (nativeInput) {
-                    nativeInput.value = name;
-                    nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
-            }, 500);
+                // Clean the URL (prevents issues on refresh)
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return; // Stop here, session is now active
+            }
         }
 
-        function logout() {
-            localStorage.removeItem("cw_token");
-            localStorage.removeItem("username");
-            location.reload();
+        if (!token) {
+            document.getElementById('auth-message').textContent = "Sign in to save progress";
+            document.getElementById('discord-login-link').style.display = 'block';
+            return;
         }
 
-        function observeGame() {
-            // Placeholder for win event listeners
+        // 2. Verify token validity with the server (and get rank data if needed)
+        document.getElementById('auth-message').textContent = "Restoring session...";
+        try {
+            const res = await fetch("/api/me", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            
+            if (res.ok) {
+                showLoggedIn(data.user, token); // Data from server includes all rank info
+            } else {
+                logout(); // Token invalid or expired
+            }
+        } catch {
+            document.getElementById('auth-message').textContent = "Offline or Session check failed.";
         }
+    }
+    
+    // Unlocks the core game buttons by injecting the username
+    function injectUsername(name) {
+        localStorage.setItem("username", name);
+        setTimeout(() => {
+            const nativeInput = document.querySelector("username-input input");
+            const customElement = document.querySelector("username-input");
+            
+            if (nativeInput) {
+                nativeInput.value = name;
+                nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
+        }, 500);
+    }
 
-        window.addEventListener("load",function(){
-            requestAnimationFrame(() => document.documentElement.classList.remove("preload"));
-            handleAuthRedirect();
-        });
+    function logout() {
+        localStorage.removeItem("cw_token");
+        localStorage.removeItem("username");
+        location.reload();
+    }
+
+    function observeGame() {
+        // Placeholder for win event listeners
+    }
+
+    // Run on page load
+    window.addEventListener("load", function() {
+        requestAnimationFrame(() => document.documentElement.classList.remove("preload"));
+        handleAuthRedirect();
+    });
     </script>
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee9b408fa25a13"}'></script>
 </body>
