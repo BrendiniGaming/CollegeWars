@@ -373,7 +373,7 @@ app.get("/api/discord/callback", async (req, res) => {
         const user = userResult.rows[0];
         const sessionToken = jwt.sign({ id: user.id }, JWT_SECRET || 'fallback_secret_key');
 
-        res.redirect(`/?token=${sessionToken}&username=${user.username}&rankTier=${user.rank_tier}&wins=${user.wins}`);
+        res.redirect(`/?token=${sessionToken}`); // Only pass the essential token
 
     } catch (error) {
         log.error("Error during Discord OAuth flow:", error);
