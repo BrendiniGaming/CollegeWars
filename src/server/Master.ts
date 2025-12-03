@@ -9,7 +9,7 @@ import { GameInfo, ID } from "../core/Schemas";
 import { generateID } from "../core/Util";
 import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
-// --- NEW IMPORT FOR DATABASE ---
+// --- NEW IMPORT FOR DB ---
 import { Pool } from "pg"; 
 
 const config = getServerConfigFromServer();
@@ -19,14 +19,56 @@ const config = getServerConfigFromServer();
 config.numWorkers = () => 1;
 // ---------------------------------------------------------------
 
-// --- DATABASE CONNECTION & SETUP ---
+// --- DATABASE CONNECTION & AUTH ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
+// --- Rank System Definitions (9 Tiers) ---
+const TIER_ORDER = [
+  "UNRANKED",
+  "BRONZE",
+  "SILVER",
+  "GOLD",
+  "PLATINUM",
+  "CHAMPION",
+  "GRAND_CHAMPION",
+  "HEROIC_CHAMPION",
+  "MASTER_CHAMPION",
+  "MASTERS",
+];
+
+const RANK_THRESHOLDS: Record<string, number> = {
+  UNRANKED: 0,
+  BRONZE: 1000,
+  SILVER: 2500,
+  GOLD: 5000,
+  PLATINUM: 8000,
+  CHAMPION: 12000,
+  GRAND_CHAMPION: 18000,
+  HEROIC_CHAMPION: 25000,
+  MASTER_CHAMPION: 35000,
+  MASTERS: 50000,
+};
+
+function getRankTier(xp: number): string {
+  let currentTier = "UNRANKED";
+  for (const tier of TIER_ORDER) {
+    if (xp >= RANK_THRESHOLDS[tier]) {
+      currentTier = tier;
+    } else {
+      break; 
+    }
+  }
+  return currentTier;
+}
+// ---------------------------------------
+
+// --- Database Init Function (Automated Migration) ---
 async function initDB(): Promise<void> {
   try {
+    // NOTE: If you are getting build errors, ensure all the required packages (pg, bcryptjs, jsonwebtoken) are in package.json
     // 1. Ensure the base users table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -40,7 +82,7 @@ async function initDB(): Promise<void> {
       );
     `);
     
-    // 2. ADD RANK COLUMNS (If they don't exist - this is safe SQL migration block)
+    // 2. ADD RANK COLUMNS (If they don't exist - ensures rank system works)
     await db.query(`
       DO $$ 
       BEGIN
@@ -90,14 +132,59 @@ app.use(
     },
   }),
 );
-app.use(express.json());
 app.set("trust proxy", 3);
 app.use(rateLimit({ windowMs: 1000, max: 20 }));
 
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// --- Helper Functions ---
+// --- Rank Route ---
+
+app.post("/api/report-game", async (req, res) => {
+  // NOTE: This route assumes the client sends a verified 'userId' and 'result'. 
+  const { userId, result } = req.body; // result = "win" or "loss"
+
+  if (!userId || !["win", "loss"].includes(result)) {
+    return res.status(400).send("Invalid request");
+  }
+
+  try {
+    // 1. Fetch current stats
+    const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).send("User not found");
+    }
+
+    let currentXP = userRes.rows[0].rank_xp;
+    let wins = userRes.rows[0].wins;
+    let gamesPlayed = userRes.rows[0].games_played;
+
+    // 2. Calculate new stats
+    const baseXP = 50;
+    const winBonus = result === "win" ? 100 : 0;
+    const totalXP = baseXP + winBonus;
+
+    currentXP += totalXP;
+    wins += (result === "win" ? 1 : 0);
+    gamesPlayed += 1;
+
+    // 3. Calculate new tier
+    const newTier = getRankTier(currentXP);
+
+    // 4. Save back to DB
+    await db.query(
+      "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
+      [currentXP, newTier, wins, gamesPlayed, userId]
+    );
+
+    res.json({ userId, rank_xp: currentXP, rank_tier: newTier, wins, games_played: gamesPlayed });
+  } catch (err) {
+    logger.error("Error updating rank:", err);
+    res.status(500).send("Internal server error");
+  }
+});
+
+// --- Helper Functions (Standard Game Logic) ---
 
 async function schedulePublicGame(playlist: MapPlaylist) {
   const gameID = generateID();
