@@ -11,7 +11,7 @@ import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 // --- NEW ACCOUNT IMPORTS ---
 import { Pool } from "pg"; 
-import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs"; // NOTE: Required if you ever switch back to email/password
 import jwt from "jsonwebtoken";
 import { URLSearchParams } from 'url';
 
@@ -22,12 +22,12 @@ const config = getServerConfigFromServer();
 config.numWorkers = () => 1;
 // ---------------------------------------------------------------
 
-// --- DATABASE CONNECTION & AUTH SETUP ---
+// --- DATABASE CONNECTION & AUTH ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET = "CollegeWarsSecretKey123";
+const JWT_SECRET = "CollegeWarsSecretKey123"; // CHANGE THIS SECRET LATER
 
 // --- Rank System Definitions (9 Tiers) ---
 const TIER_ORDER = [
@@ -71,7 +71,7 @@ function getRankTier(xp: number): string {
 
 async function initDB(): Promise<void> {
   try {
-    // 1. Ensure the base users table exists (using Discord ID for primary identity)
+    // 1. Create the base users table (using Discord ID for primary identity)
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -86,7 +86,19 @@ async function initDB(): Promise<void> {
       );
     `);
     
-    // NOTE: Old migration columns (like password_hash) are removed to simplify Discord auth.
+    // 2. ADD RANK COLUMNS (Safe migration block)
+    await db.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_tier') THEN
+              ALTER TABLE users ADD COLUMN rank_tier VARCHAR(50) DEFAULT 'UNRANKED';
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='rank_xp') THEN
+              ALTER TABLE users ADD COLUMN rank_xp INTEGER DEFAULT 0;
+          END IF;
+      END $$;
+    `);
+
     logger.info("Database initialized: User and Rank tables are ready.");
   } catch (err) {
     logger.error("Database initialization failed:", err);
@@ -159,234 +171,4 @@ async function schedulePublicGame(playlist: MapPlaylist) {
 }
 
 async function fetchLobbies(): Promise<number> {
-  const fetchPromises: Promise<GameInfo | null>[] = [];
-  for (const gameID of new Set(publicLobbyIDs)) {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000);
-    const port = config.workerPort(gameID);
-    const promise = fetch(`http://localhost:${port}/api/game/${gameID}`, {
-      headers: { [config.adminHeader()]: config.adminToken() },
-      signal: controller.signal,
-    })
-      .then((resp) => resp.json())
-      .then((json) => {
-        return json as GameInfo;
-      })
-      .catch((error) => {
-        log.error(`Error fetching game ${gameID}:`, error);
-        publicLobbyIDs.delete(gameID);
-        return null;
-      });
-    fetchPromises.push(promise);
-  }
-  const results = await Promise.all(fetchPromises);
-  const lobbyInfos: GameInfo[] = results
-    .filter((result) => result !== null)
-    .map((gi: GameInfo) => {
-      return {
-        gameID: gi.gameID,
-        numClients: gi?.clients?.length ?? 0,
-        gameConfig: gi.gameConfig,
-        msUntilStart: (gi.msUntilStart ?? Date.now()) - Date.now(),
-      } as GameInfo;
-    });
-
-  lobbyInfos.forEach((l) => {
-    if ("msUntilStart" in l && l.msUntilStart !== undefined && l.msUntilStart <= 250) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-    if (
-      "gameConfig" in l &&
-      l.gameConfig !== undefined &&
-      "maxPlayers" in l.gameConfig &&
-      l.gameConfig.maxPlayers !== undefined &&
-      "numClients" in l &&
-      l.numClients !== undefined &&
-      l.gameConfig.maxPlayers <= l.numClients
-    ) {
-      publicLobbyIDs.delete(l.gameID);
-      return;
-    }
-  });
-
-  publicLobbiesJsonStr = JSON.stringify({ lobbies: lobbyInfos });
-  return publicLobbyIDs.size;
-}
-
-// --- MAIN START FUNCTION ---
-
-export async function startMaster() {
-  if (!cluster.isPrimary) {
-    throw new Error("startMaster() should only be called in the primary process");
-  }
-
-  // Initialize DB tables and rank columns
-  await initDB(); 
-
-  // --- CRASH FIX: Hardcode Workers to 1 ---
-  const NUM_WORKERS = 1;
-
-  log.info(`Primary ${process.pid} is running`);
-  log.info(`Setting up ${NUM_WORKERS} workers...`);
-
-  for (let i = 0; i < NUM_WORKERS; i++) {
-    const worker = cluster.fork({ WORKER_ID: i });
-    log.info(`Started worker ${i} (PID: ${worker.process.pid})`);
-  }
-
-  cluster.on("message", (worker, message) => {
-    if (message.type === "WORKER_READY") {
-      const workerId = message.workerId;
-      readyWorkers.add(workerId);
-      log.info(`Worker ${workerId} is ready. (${readyWorkers.size}/${NUM_WORKERS} ready)`);
-
-      if (readyWorkers.size === NUM_WORKERS) {
-        log.info("All workers ready, starting game scheduling");
-        const scheduleLobbies = () => {
-          schedulePublicGame(playlist).catch((error) => {
-            log.error("Error scheduling public game:", error);
-          });
-        };
-        setInterval(() => {
-          fetchLobbies().then((lobbies) => {
-            if (lobbies === 0) scheduleLobbies();
-          });
-        }, 100);
-      }
-    }
-  });
-
-  cluster.on("exit", (worker, code, signal) => {
-    const workerId = (worker as any).process?.env?.WORKER_ID;
-    if (workerId) cluster.fork({ WORKER_ID: workerId });
-  });
-
-  const PORT = parseInt(process.env.PORT || "3000");
-  const HOST = "0.0.0.0";
-  server.listen(PORT, HOST, () => {
-    log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
-  });
-}
-
-// --- NEW DISCORD CALLBACK ROUTE ---
-
-app.get("/api/discord/callback", async (req, res) => {
-    const authCode = req.query.code as string;
-    
-    if (!authCode) {
-        return res.status(400).send("Discord authentication code missing.");
-    }
-    
-    // 1. Get Client ID and Secret securely from environment variables
-    // NOTE: Ensure DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET are set in Railway Variables
-    const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-    const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-    const REDIRECT_URI = "https://www.collegewarsio.com/api/discord/callback"; // Must match your Discord App setting
-
-    if (!CLIENT_ID || !CLIENT_SECRET) {
-        log.error("Missing Discord credentials in environment variables.");
-        return res.status(500).send("Server configuration error.");
-    }
-
-    try {
-        // 2. Exchange the temporary code for an Access Token
-        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code: authCode,
-                redirect_uri: REDIRECT_URI,
-            }),
-        });
-
-        const tokenData = await tokenResponse.json();
-
-        if (tokenData.error) {
-            log.error("Discord token exchange failed:", tokenData.error_description);
-            return res.status(401).send("Authentication failed: " + tokenData.error_description);
-        }
-
-        const accessToken = tokenData.access_token;
-
-        // 3. Use the Access Token to get User Data (ID, Email, Username)
-        const userResponse = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                authorization: `Bearer ${accessToken}`,
-            },
-        });
-        
-        const userData = await userResponse.json();
-        const discordId = userData.id;
-        const username = userData.username;
-
-        // --- 4. Database Logic (Create/Login) ---
-        let userResult = await db.query("SELECT * FROM users WHERE discord_id = $1", [discordId]);
-
-        if (userResult.rows.length === 0) {
-            // User does not exist, create new one
-            userResult = await db.query(
-                "INSERT INTO users (discord_id, username, email) VALUES ($1, $2, $3) RETURNING id, username, wins, rank_tier, rank_xp",
-                [discordId, username, userData.email || ''] // Use email from Discord if provided
-            );
-        }
-
-        const user = userResult.rows[0];
-
-        // 5. Issue Game Session Token (JWT)
-        const sessionToken = jwt.sign({ id: user.id }, JWT_SECRET);
-
-        // Redirect back to the main game page with the token
-        res.redirect(`/?token=${sessionToken}&username=${user.username}`);
-
-    } catch (error) {
-        log.error("Error during Discord OAuth flow:", error);
-        res.status(500).send("Server error during login process.");
-    }
-});
-
-
-// --- Standard Routes ---
-
-app.get("/api/env", async (req, res) => {
-  const envConfig = { game_env: process.env.GAME_ENV };
-  if (!envConfig.game_env) return res.sendStatus(500);
-  res.json(envConfig);
-});
-
-app.get("/api/public_lobbies", async (req, res) => {
-  res.send(publicLobbiesJsonStr);
-});
-
-app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
-  if (req.headers[config.adminHeader()] !== config.adminToken()) {
-    return res.status(401).send("Unauthorized");
-  }
-  const { gameID, clientID } = req.params;
-  if (!ID.safeParse(gameID).success || !ID.safeParse(clientID).success) {
-    res.sendStatus(400);
-    return;
-  }
-  try {
-    const response = await fetch(
-      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
-      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to kick player: ${response.statusText}`);
-    }
-    res.sendStatus(200);
-  } catch (error) {
-    log.error(`Error kicking player from game ${gameID}:`, error);
-    res.sendStatus(500);
-  }
-});
-
-app.get("*", function (req, res) {
-  res.sendFile(path.join(__dirname, "../../static/index.html"));
-});
+  const fetchPromises: Promise<GameInfo | null>[] =
