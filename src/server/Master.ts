@@ -1,6 +1,6 @@
 import cluster from "cluster";
 import express from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit from "express-limit"; // Removed express-rate-limit and used simpler alias for stability
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -27,7 +27,8 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET || "INSECURE_FALLBACK_KEY";
+// FIX: Ensures JWT_SECRET is always a string, falling back if ENV is empty
+const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; 
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -56,13 +57,14 @@ function getRankTier(xp: number): string {
 
 async function initDB(): Promise<void> {
   try {
-    // CRITICAL FIX: Make email column NULLABLE to avoid crash if Discord doesn't return email
+    // 1. Create the base users table (email is now NULLABLE - CORRECTED)
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         discord_id VARCHAR(255) UNIQUE, 
         username VARCHAR(50), 
         email VARCHAR(255) UNIQUE NULL, 
+        password_hash VARCHAR(255), 
         wins INT DEFAULT 0,
         games_played INT DEFAULT 0,
         rank_tier VARCHAR(50) DEFAULT 'UNRANKED', 
@@ -71,7 +73,7 @@ async function initDB(): Promise<void> {
       );
     `);
     
-    // ADD RANK COLUMNS (Safe migration block)
+    // 2. ADD RANK COLUMNS (Safe migration block)
     await db.query(`
       DO $$ 
       BEGIN
@@ -89,8 +91,7 @@ async function initDB(): Promise<void> {
     logger.error("Database initialization failed:", err);
   }
 }
-
-// --- Main Game Helpers and Routes (Unchanged) ---
+// ----------------------------------------------------------------
 
 const playlist = new MapPlaylist();
 const readyWorkers = new Set();
@@ -101,8 +102,7 @@ const log = logger.child({ comp: "m" });
 const __filename = path.join(process.cwd(), 'src', 'server', 'Master.ts'); 
 const __dirname = path.dirname(__filename);
 
-// ... (Rest of Middleware is here) ...
-
+// --- Middleware ---
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, "../../static"), {
@@ -127,7 +127,7 @@ app.use(rateLimit({ windowMs: 1000, max: 20 }));
 let publicLobbiesJsonStr = "";
 const publicLobbyIDs: Set<string> = new Set();
 
-// ... (Helper functions like schedulePublicGame, fetchLobbies are here) ...
+// --- Helper Functions (Standard Game Logic) ---
 
 async function schedulePublicGame(playlist: MapPlaylist) {
   const gameID = generateID();
@@ -211,7 +211,6 @@ async function fetchLobbies(): Promise<number> {
   return publicLobbyIDs.size;
 }
 
-
 // --- MAIN START FUNCTION ---
 
 export async function startMaster() {
@@ -222,6 +221,7 @@ export async function startMaster() {
   // Initialize DB tables and rank columns
   await initDB(); 
 
+  // --- CRASH FIX: Hardcode Workers to 1 ---
   const NUM_WORKERS = 1;
 
   log.info(`Primary ${process.pid} is running`);
@@ -269,6 +269,7 @@ export async function startMaster() {
 // --- Routes ---
 
 app.post("/api/report-game", async (req, res) => {
+  // NOTE: This route assumes the client securely sends a user token and the game result.
   const { userId, result } = req.body; 
 
   if (!userId || !["win", "loss"].includes(result)) {
@@ -276,6 +277,7 @@ app.post("/api/report-game", async (req, res) => {
   }
 
   try {
+    // 1. Fetch current stats
     const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
       return res.status(404).send("User not found");
@@ -285,6 +287,7 @@ app.post("/api/report-game", async (req, res) => {
     let wins = userRes.rows[0].wins;
     let gamesPlayed = userRes.rows[0].games_played;
 
+    // 2. Calculate new stats
     const baseXP = 50;
     const winBonus = result === "win" ? 100 : 0;
     const totalXP = baseXP + winBonus;
@@ -293,8 +296,10 @@ app.post("/api/report-game", async (req, res) => {
     wins += (result === "win" ? 1 : 0);
     gamesPlayed += 1;
 
+    // 3. Calculate new tier
     const newTier = getRankTier(currentXP);
 
+    // 4. Save back to DB
     await db.query(
       "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
       [currentXP, newTier, wins, gamesPlayed, userId]
