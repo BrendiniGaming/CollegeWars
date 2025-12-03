@@ -164,14 +164,7 @@ async function handleAuthRedirect() {
         }
     } catch {
         document.getElementById('auth-message').textContent = "Offline or Session check failed.";
-    }
-}
 
-        if (!token) {
-            document.getElementById('auth-message').textContent = "Sign in to save progress";
-            document.getElementById('discord-login-link').style.display = 'block';
-            return;
-        }
 
         // 2. Verify token validity with the server (and get rank data if needed)
         document.getElementById('auth-message').textContent = "Restoring session...";
