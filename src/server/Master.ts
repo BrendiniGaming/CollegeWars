@@ -1,6 +1,6 @@
 import cluster from "cluster";
 import express from "express";
-import rateLimit from "express-limit"; // Removed express-rate-limit and used simpler alias for stability
+import rateLimit from "express-rate-limit"; // Corrected module name
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
