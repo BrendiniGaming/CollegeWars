@@ -14,27 +14,6 @@
         .bg-image { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-image: url("/images/EuropeBackgroundBlurred.webp"); background-size: cover; }
         .bg-image::before { content: ""; position: absolute; width: 100%; height: 100vh; background: rgba(30, 58, 138, 0.2); }
         .college-logo { font-family: 'Arial Black', sans-serif; font-size: 3rem; font-weight: 900; text-transform: uppercase; background: linear-gradient(to bottom, #FFD700, #DAA520); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5)); }
-        
-        /* Custom Styles for Discord Button Placement */
-        .discord-auth-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
-        }
-        .discord-button {
-            background-color: #5865F2; 
-            color: white; 
-            border-radius: 5px; 
-            text-decoration: none; 
-            font-weight: bold; 
-            padding: 12px 20px;
-            display: block;
-            margin-top: 10px;
-            max-width: 300px;
-        }
-        .rank-icon { height: 30px; width: 30px; margin-right: 8px; vertical-align: middle; }
     </style>
     <script>document.documentElement.className = "preload";</script>
 </head>
@@ -51,21 +30,10 @@
 
     <main class="flex justify-center flex-grow">
         <div class="container pt-12">
-            
-            <div class="discord-auth-container">
-                <div id="auth-status-panel" style="background-color: #1f2937; padding: 15px; border-radius: 8px; color: white; min-width: 280px; text-align: center;">
-                    <p id="auth-message">Checking session...</p>
-                    <div id="auth-info" style="margin-top: 10px;"></div>
-                    
-                    <a id="discord-login-link" 
-                       href="https://discord.com/api/oauth2/authorize?client_id=YOUR_DISCORD_CLIENT_ID&redirect_uri=https%3A%2F%2Fwww.collegewarsio.com%2Fapi%2Fdiscord%2Fcallback&response_type=code&scope=identify%20email"
-                       class="discord-button" style="display: none;">
-                        Sign in with Discord
-                    </a>
-                </div>
-            </div>
+            <token-login style="display:none;"></token-login> 
+            <matchmaking-modal style="display:none;"></matchmaking-modal>
 
-            <div class="container__row" style="margin-top: 20px;">
+            <div class="container__row">
                 <flag-input class="w-[20%] md:w-[20%]"></flag-input>
                 <territory-patterns-modal class="w-[20%] md:w-[15%]">
                     <button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center"></button>
@@ -73,9 +41,8 @@
                 <username-input class="relative w-full"></username-input>
                 <news-button class="w-[20%] component-hideable"></news-button>
             </div>
-            
             <div><public-lobby class="block"></public-lobby></div>
-            <div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
+            
             <div class="container__row container__row--equal">
                 <o-button id="host-lobby-button" title="Create Dorm Lobby" translationKey="main.create_lobby" block secondary></o-button>
                 <o-button id="join-private-lobby-button" title="Join Class" translationKey="main.join_lobby" block secondary></o-button>
@@ -88,104 +55,9 @@
 
     <button id="settings-button" title="Settings" class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center" style="width:80px;height:80px;background-color:#0075ff"><img src="../../resources/images/SettingIconWhite.svg" alt="Settings" style="width:72px;height:72px"/></button>
     <div id="customMenu" class="mt-4 sm:mt-6 lg:mt-8"><ul></ul></div><div id="app"></div><div id="radialMenu" class="radial-menu"></div><div class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col"><player-info-overlay></player-info-overlay></div><div class="fixed bottom-[30px] sm:bottom-auto sm:top-[20px] z-50 mx-auto max-w-max inset-x-0 items-center"><heads-up-message></heads-up-message></div><div class="bottom-0 w-full flex-col-reverse sm:flex-row z-50 md:w-[320px]" style="position:fixed;pointer-events:none"><div class="w-full md:w-2/3 md:fixed sm:right-0 md:bottom-0 md:flex flex-col items-end" style="pointer-events:none"><chat-display></chat-display><events-display></events-display></div><div style="pointer-events:auto"><control-panel></control-panel></div></div>
-    <footer class="flex justify-center px-3 py-3 md:px-6 md:py-3 bg-[var(--boxBackgroundColor)] backdrop-blur-sm"><div class="flex flex-col md:flex-row flex-nowrap justify-between items-center gap-4 md:gap-0 w-full max-w-[860px] flex-1"><div class="flex flex-col sm:flex-row gap-4 sm:gap-5 text-white/70 justify-center md:justify-start flex-shrink-0"><a href="#" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">CW Wiki</a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Community</span></a><a target="_blank" href="#" class="text-white/70 hover:text-white whitespace-nowrap"><span>Discord</span></a></div><div class="flex justify-center text-white/70 flex-shrink-0"><a href="" class="text-white/70 hover:text-white inline-flex items-center gap-2 whitespace-nowrap" target="_blank">© 2025 College Wars</a></div><div class="flex flex-col sm:flex-row gap-4 sm:gap-4 text-white/70 justify-center md:justify-end flex-shrink-0"><a href="/privacy-policy.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Privacy Policy</a><a href="/terms-of-service.html" class="text-white/70 hover:text-white whitespace-nowrap" target="_blank">Terms of Service</a></div></div></footer>
     <account-button></account-button><single-player-modal></single-player-modal><host-lobby-modal></host-lobby-modal><join-private-lobby-modal></join-private-lobby-modal><emoji-table></emoji-table><build-menu></build-menu><win-modal></win-modal><game-starting-modal></game-starting-modal><game-top-bar></game-top-bar><unit-display></unit-display><div class="flex fixed top-[20px] right-[20px] z-[1000] items-start gap-2"><replay-panel></replay-panel><game-right-sidebar></game-right-sidebar></div><settings-modal></settings-modal><player-panel></player-panel><spawn-timer></spawn-timer><help-modal></help-modal><dark-mode-button></dark-mode-button><stats-button></stats-button><alert-frame></alert-frame><chat-modal></chat-modal><user-setting></user-setting><multi-tab-modal></multi-tab-modal><game-left-sidebar></game-left-sidebar><flag-input-modal></flag-input-modal><performance-overlay></performance-overlay>
     <div id="language-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex justify-center items-center"><div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full"><h2 class="text-xl font-semibold mb-4">Select Language</h2><div id="language-list" class="space-y-2 max-h-80 overflow-y-auto"></div><button class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded" onclick="document.getElementById('language-modal').classList.add('hidden')">Close</button></div></div>
-
-    <script>
-    // --- GLOBAL UTILITY ---
-    function getRankIconPath(rankTier) {
-        // Ensure this directory exists and your 9 icons are named correctly
-        return `/resources/images/ranks/rank_${rankTier.toLowerCase()}.png`;
-    }
-
-    // --- MAIN CLIENT LOGIC ---
-
-    // Function to handle the redirect from Discord and initiate the session
-    async function handleAuthRedirect() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
-        const username = urlParams.get('username');
-
-        if (token) {
-            // 1. Save the token and username
-            localStorage.setItem('cw_token', token);
-            localStorage.setItem('username', username);
-
-            // 2. Clean the URL and reload to initialize the game state cleanly
-            window.history.replaceState({}, document.title, window.location.pathname);
-            location.reload(); 
-            return;
-        }
-        
-        // 3. If no token, check for existing session
-        checkSession();
-    }
-    
-    async function checkSession() {
-        const token = localStorage.getItem("cw_token");
-        const username = localStorage.getItem("username");
-
-        if (token && username) {
-            // Fetch profile to verify token and get rank
-            try {
-                const res = await fetch("/api/me", { headers: { "Authorization": "Bearer " + token } });
-                if (res.ok) {
-                    const data = await res.json();
-                    showLoggedIn(data.user);
-                    return;
-                }
-            } catch (e) { console.log("Session check failed."); }
-        }
-        
-        // If login failed or no token, show the Discord button
-        document.getElementById('auth-message').textContent = "Not Signed In";
-        document.getElementById('discord-login-link').style.display = 'block';
-    }
-
-    function showLoggedIn(user) {
-        // Hide the Discord button and show the user status
-        document.getElementById('discord-login-link').style.display = 'none';
-        document.getElementById('auth-status-panel').style.minHeight = '100px';
-
-        document.getElementById('auth-info').innerHTML = 
-            `<img src="${getRankIconPath(user.rank_tier)}" alt="${user.rank_tier}" class="rank-icon">` + 
-            `Welcome, <span style="color:#93C5FD; font-size:1.1em; font-weight:bold;">${user.username}</span><br>` +
-            `Tier: <span style="color:#4ADE80; font-weight:bold;">${user.rank_tier}</span> | Wins: ${user.wins}<br>` +
-            `<button onclick="logout()" style="text-decoration: underline; color: #F87171; margin-top: 5px;">Logout</button>`;
-            
-        // --- CRITICAL FIX: Unlock the Game ---
-        injectUsername(user.username);
-        observeGame(); // Start win detection
-    }
-
-    // Unlocks the core game buttons by injecting the username
-    function injectUsername(name) {
-        // We assume the game is loaded enough by now
-        const nativeInput = document.querySelector("username-input input");
-        const customElement = document.querySelector("username-input");
-        
-        if (nativeInput) {
-            nativeInput.value = name;
-            nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        if (customElement) customElement.style.display = 'none'; // Hide the redundant guest input box
-    }
-
-    function logout() {
-        localStorage.removeItem("cw_token");
-        localStorage.removeItem("username");
-        location.reload();
-    }
-
-    function observeGame() {
-        // Implementation for watching the win modal and calling reportWin goes here
-        // ... (This code is complex and can be implemented after the core flow is verified)
-    }
-
-    // Run the main authentication checker
-    window.addEventListener('load', handleAuthRedirect);
-
-    </script>
+    <script>window.addEventListener("load",function(){requestAnimationFrame(()=>{document.documentElement.classList.remove("preload")});});</script>
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"03d93e6fefb349c28ee69b408fa25a13"}'></script>
 </body>
 </html>
