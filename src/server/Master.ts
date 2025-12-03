@@ -25,9 +25,9 @@ config.numWorkers = () => 1;
 // --- DATABASE CONNECTION & AUTH VARIABLES ---
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // SIMPLIFIED SSL FIX
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890";
+const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; // FIX: Added robust fallback
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -259,6 +259,7 @@ export async function startMaster() {
   });
 
   const PORT = parseInt(process.env.PORT || "3000");
+  const HOST = "0.0.0.0";
   server.listen(PORT, HOST, () => {
     log.info(`Master HTTP server listening on port ${PORT} and host ${HOST}`);
   });
@@ -267,6 +268,7 @@ export async function startMaster() {
 // --- Routes ---
 
 app.post("/api/report-game", async (req, res) => {
+  // NOTE: This route assumes the client securely sends a user token and the game result.
   const { userId, result } = req.body; 
 
   if (!userId || !["win", "loss"].includes(result)) {
@@ -274,6 +276,7 @@ app.post("/api/report-game", async (req, res) => {
   }
 
   try {
+    // 1. Fetch current stats
     const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
       return res.status(404).send("User not found");
@@ -283,6 +286,7 @@ app.post("/api/report-game", async (req, res) => {
     let wins = userRes.rows[0].wins;
     let gamesPlayed = userRes.rows[0].games_played;
 
+    // 2. Calculate new stats
     const baseXP = 50;
     const winBonus = result === "win" ? 100 : 0;
     const totalXP = baseXP + winBonus;
@@ -291,8 +295,10 @@ app.post("/api/report-game", async (req, res) => {
     wins += (result === "win" ? 1 : 0);
     gamesPlayed += 1;
 
+    // 3. Calculate new tier
     const newTier = getRankTier(currentXP);
 
+    // 4. Save back to DB
     await db.query(
       "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
       [currentXP, newTier, wins, gamesPlayed, userId]
@@ -325,4 +331,91 @@ app.get("/api/discord/callback", async (req, res) => {
         const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: authCode,
+                redirect_uri: REDIRECT_URI,
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.error) {
+            log.error("Discord token exchange failed:", tokenData.error_description);
+            return res.status(401).send("Authentication failed: " + tokenData.error_description);
+        }
+
+        const accessToken = tokenData.access_token;
+
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                authorization: `Bearer ${accessToken}`,
+            },
+        });
+        
+        const userData = await userResponse.json();
+        const discordId = userData.id;
+        const username = userData.username;
+
+        let userResult = await db.query("SELECT * FROM users WHERE discord_id = $1", [discordId]);
+
+        if (userResult.rows.length === 0) {
+            userResult = await db.query(
+                "INSERT INTO users (discord_id, username, email) VALUES ($1, $2, $3) RETURNING id, username, wins, rank_tier, rank_xp",
+                [discordId, username, userData.email || ''] 
+            );
+        }
+
+        const user = userResult.rows[0];
+        const sessionToken = jwt.sign({ id: user.id }, JWT_SECRET || 'fallback_secret_key');
+
+        res.redirect(`/?token=${sessionToken}&username=${user.username}&rankTier=${user.rank_tier}&wins=${user.wins}`);
+
+    } catch (error) {
+        log.error("Error during Discord OAuth flow:", error);
+        res.status(500).send("Server error during login process.");
+    }
+});
+
+
+app.get("/api/env", async (req, res) => {
+  const envConfig = { game_env: process.env.GAME_ENV };
+  if (!envConfig.game_env) return res.sendStatus(500);
+  res.json(envConfig);
+});
+
+app.get("/api/public_lobbies", async (req, res) => {
+  res.send(publicLobbiesJsonStr);
+});
+
+app.post("/api/kick_player/:gameID/:clientID", async (req, res) => {
+  if (req.headers[config.adminHeader()] !== config.adminToken()) {
+    return res.status(401).send("Unauthorized");
+  }
+  const { gameID, clientID } = req.params;
+  if (!ID.safeParse(gameID).success || !ID.safeParse(clientID).success) {
+    res.sendStatus(400);
+    return;
+  }
+  try {
+    const response = await fetch(
+      `http://localhost:${config.workerPort(gameID)}/api/kick_player/${gameID}/${clientID}`,
+      { method: "POST", headers: { [config.adminHeader()]: config.adminToken() } }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to kick player: ${response.statusText}`);
+    }
+    res.sendStatus(200);
+  } catch (error) {
+    log.error(`Error kicking player from game ${gameID}:`, error);
+    res.sendStatus(500);
+  }
+});
+
+app.get("*", function (req, res) {
+  res.sendFile(path.join(__dirname, "../../static/index.html"));
+});
