@@ -15,7 +15,7 @@ import bcrypt from "bcryptjs"; // NOTE: Required if you ever switch back to emai
 import jwt from "jsonwebtoken";
 import { URLSearchParams } from 'url';
 
-const config = getServerConfigFromServer();
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // --- CRITICAL FIX: Worker Limit (Prevents 502/Memory Crash) ---
 // @ts-ignore
