@@ -50,6 +50,41 @@ app.get('/api/discord/callback', async (req, res) => {
   }
 });
 
+// --- THE MISSING "WHO AM I?" ROUTE ---
+app.get('/api/me', async (req, res) => {
+  // 1. Get the token from the header (sent by index.html)
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1]; // Remove "Bearer " string
+
+  try {
+    // 2. Ask Discord: "Who does this token belong to?"
+    const userResponse = await axios.get('https://discord.com/api/users/@me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const discordUser = userResponse.data;
+
+    // 3. Send the user data back to the frontend
+    // Note: In the future, you will query YOUR database here to get real 'wins' and 'rank'
+    res.json({
+      user: {
+        username: discordUser.username,
+        email: discordUser.email,
+        rank_tier: "Rookie", // Placeholder default
+        wins: 0              // Placeholder default
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Profile fetch error:', error.response?.data || error.message);
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
 // Main entry point of the application
 async function main() {
   if (cluster.isPrimary) {
@@ -107,4 +142,5 @@ async function setupTunnels() {
 app.listen(80, () => {
   console.log("Express server listening on port 80");
 });
+
 
