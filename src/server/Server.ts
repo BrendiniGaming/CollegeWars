@@ -1,5 +1,8 @@
 import cluster from "cluster";
 import * as dotenv from "dotenv";
+import express from "express";
+import axios from "axios";
+
 import { GameEnv } from "../core/configuration/Config";
 import { getServerConfigFromServer } from "../core/configuration/ConfigLoader";
 import { Cloudflare, TunnelConfig } from "./Cloudflare";
@@ -10,17 +13,52 @@ const config = getServerConfigFromServer();
 
 dotenv.config();
 
+// Create the Express app
+const app = express();
+
+// --- THE DISCORD CALLBACK ROUTE (TypeScript Version) ---
+app.get('/api/discord/callback', async (req, res) => {
+  const code = req.query.code as string;
+
+  if (!code) {
+    return res.redirect('/?error=no_code_provided');
+  }
+
+  try {
+    const params = new URLSearchParams({
+      client_id: process.env.DISCORD_CLIENT_ID || '',
+      client_secret: process.env.DISCORD_CLIENT_SECRET || '',
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: 'https://www.collegewarsio.com/api/discord/callback' // Must match EXACTLY what is in Discord Dev Portal
+    });
+
+    const tokenResponse = await axios.post(
+      'https://discord.com/api/oauth2/token',
+      params.toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    res.redirect(`/?token=${accessToken}`);
+  } catch (error: any) {
+    console.error('Discord Auth Error:', error.response?.data || error.message);
+    res.redirect('/?error=auth_failed');
+  }
+});
+
 // Main entry point of the application
 async function main() {
-  // Check if this is the primary (master) process
   if (cluster.isPrimary) {
     if (config.env() !== GameEnv.Dev) {
-// await setupTunnels();
+      // await setupTunnels();
     }
     console.log("Starting master process...");
     await startMaster();
   } else {
-    // This is a worker process
     console.log("Starting worker process...");
     await startWorker();
   }
@@ -42,7 +80,6 @@ async function setupTunnels() {
 
   const domainToService = new Map<string, string>().set(
     config.subdomain(),
-    // TODO: change to 3000 when we have a proper tunnel setup.
     `http://localhost:80`,
   );
 
@@ -65,3 +102,9 @@ async function setupTunnels() {
 
   await cloudflare.startCloudflared();
 }
+
+// Start listening so the route is reachable
+app.listen(80, () => {
+  console.log("Express server listening on port 80");
+});
+
