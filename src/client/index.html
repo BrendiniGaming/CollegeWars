@@ -40,10 +40,16 @@
 <script>
 async function register(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t){document.getElementById("auth-status").innerText="Enter email & password";return}const n=prompt("Enter Student Name:");if(!n)return;document.getElementById("auth-status").innerText="Enrolling...";try{const a=await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:n,email:e,password:t})}),s=await a.json();s.success?(document.getElementById("auth-status").innerText="Success! Please Login.",document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-green-400"):(document.getElementById("auth-status").innerText="Error: "+s.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(r){document.getElementById("auth-status").innerText="Connection Error"}}
 async function login(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t)return;document.getElementById("auth-status").innerText="Verifying...";try{const n=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:t})}),a=await n.json();
-// 👇 MODIFIED LINE: Now displays Rank and XP, assuming server sends these fields
-a.success?(document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: <span class="text-yellow-400">${a.user.rank || 'Unranked'}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`,localStorage.setItem("cw_token",a.token),document.getElementById("login-email").style.display="none",document.getElementById("login-pass").style.display="none")
-// 👆 END OF MODIFIED LINE
-:(document.getElementById("auth-status").innerText="Failed: "+a.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(s){document.getElementById("auth-status").innerText="Connection Error"}}
+// Logic split into IF/ELSE for clarity and to hide the login box on success
+if (a.success) {
+    document.getElementById("auth-box").style.display="none"; // Hides the whole box
+    document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: <span class="text-yellow-400">${a.user.rank || 'Unranked'}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`;
+    localStorage.setItem("cw_token",a.token);
+} else {
+    document.getElementById("auth-status").innerText="Failed: "+a.error;
+    document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400";
+}
+}catch(s){document.getElementById("auth-status").innerText="Connection Error"}}
 </script>
 <div class="container__row"><flag-input class="w-[20%] md:w-[20%]"></flag-input><territory-patterns-modal class="w-[20%] md:w-[15%]"><button id="territory-patterns-input-preview-button" class="w-full border p-[4px] rounded-lg flex cursor-pointer border-black/30 dark:border-gray-300/60 bg-white/70 dark:bg-[rgba(55,65,81,0.7)] justify-center" title="Pick patterns"></button></territory-patterns-modal><username-input class="relative w-full"></username-input><news-button class="w-[20%] component-hideable"></news-button></div>
 <div></div><div><public-lobby class="block"></public-lobby></div><div><matchmaking-button class="w-[20%] md:w-[15%]"></matchmaking-button></div>
