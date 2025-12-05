@@ -46,14 +46,27 @@ function hideMainMenu() {
     }
 }
 
+/**
+ * Converts rank names (e.g., "Grand Champion") into the filename format 
+ * (e.g., "Grandchampion") to match your asset structure.
+ */
+function formatRankNameForPath(rankName) {
+    // 1. Remove all spaces
+    // 2. Ensure the first letter is capitalized (like "Grandchampion")
+    return rankName.replace(/\s/g, ''); 
+}
+
 async function register(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t){document.getElementById("auth-status").innerText="Enter email & password";return}const n=prompt("Enter Student Name:");if(!n)return;document.getElementById("auth-status").innerText="Enrolling...";try{const a=await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:n,email:e,password:t})}),s=await a.json();s.success?(document.getElementById("auth-status").innerText="Success! Please Login.",document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-green-400"):(document.getElementById("auth-status").innerText="Error: "+s.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(r){document.getElementById("auth-status").innerText="Connection Error"}}
 async function login(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t)return;document.getElementById("auth-status").innerText="Verifying...";try{const n=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:t})}),a=await n.json();
 
 if (a.success) {
-    // Determine the rank name and default it to 'Unranked' if not set
     const userRank = a.user.rank || 'Unranked';
-    // DYNAMICALLY CREATE THE IMAGE SOURCE USING THE RANK NAME and .png EXTENSION
-    const rankIconHtml = `<img src="/resources/images/ranks/${userRank}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
+    
+    // 💡 NEW STEP: Convert the rank name to match the file name (e.g., "Grand Champion" -> "Grandchampion")
+    const rankFileName = formatRankNameForPath(userRank);
+    
+    // DYNAMICALLY CREATE THE IMAGE SOURCE using the corrected file name
+    const rankIconHtml = `<img src="/resources/images/ranks/${rankFileName}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
 
     // 1. Display the user stats, including the icon
     document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: ${rankIconHtml}<span class="text-yellow-400">${userRank}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`;
