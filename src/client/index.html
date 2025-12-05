@@ -67,7 +67,7 @@ if (a.success) {
     const rankFileName = getRankFileName(userRank); 
     
     // DYNAMICALLY CREATE THE IMAGE SOURCE using the corrected file name
-    const rankIconHtml = `<img src="/resources/images/ranks/${rankFileName}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
+    const rankIconHtml = `<img src="/images/ranks/${rankFileName}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
 
     // 1. Display the user stats, including the icon
     document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: ${rankIconHtml}<span class="text-yellow-400">${userRank}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`;
