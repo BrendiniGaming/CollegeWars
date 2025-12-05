@@ -11,7 +11,7 @@ import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 // --- REQUIRED IMPORTS FOR DB/AUTH ---
 import { Pool } from "pg"; 
-import bcrypt from "bcryptjs"; // Re-added for manual password hashing
+import bcrypt from "bcryptjs"; 
 import jwt from "jsonwebtoken";
 
 const config = getServerConfigFromServer();
@@ -26,7 +26,7 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; // Keep secure secret
+const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890";
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -55,7 +55,7 @@ function getRankTier(xp: number): string {
 
 async function initDB(): Promise<void> {
   try {
-    // 1. Create the base users table (Restored to require Email/Password hash for manual login)
+    // 1. Create the base users table (Requires Email/Password hash for manual login)
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -331,7 +331,6 @@ app.post("/api/report-game", async (req, res) => {
   }
 
   try {
-    // 1. Fetch current stats
     const userRes = await db.query("SELECT rank_xp, wins, games_played FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) {
       return res.status(404).send("User not found");
@@ -341,7 +340,6 @@ app.post("/api/report-game", async (req, res) => {
     let wins = userRes.rows[0].wins;
     let gamesPlayed = userRes.rows[0].games_played;
 
-    // 2. Calculate new stats
     const baseXP = 50;
     const winBonus = result === "win" ? 100 : 0;
     const totalXP = baseXP + winBonus;
@@ -350,10 +348,8 @@ app.post("/api/report-game", async (req, res) => {
     wins += (result === "win" ? 1 : 0);
     gamesPlayed += 1;
 
-    // 3. Calculate new tier
     const newTier = getRankTier(currentXP);
 
-    // 4. Save back to DB
     await db.query(
       "UPDATE users SET rank_xp = $1, rank_tier = $2, wins = $3, games_played = $4 WHERE id = $5",
       [currentXP, newTier, wins, gamesPlayed, userId]
