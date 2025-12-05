@@ -47,16 +47,14 @@ function hideMainMenu() {
 }
 
 /**
- * Converts rank names (e.g., "Grand Champion") into the filename format 
- * (e.g., "Grandchampion") to match your asset structure.
+ * Converts rank names (e.g., "Grand Champion") into the standardized 
+ * filename format (e.g., "grandchampion") by removing spaces and forcing lowercase.
  */
-function formatRankNameForPath(rankName) {
-    // If the rank name is exactly "Unranked" (which is the filename), return it.
-    if (rankName === 'Unranked') {
-        return 'Unranked'; 
-    }
-    // For other ranks, remove spaces to match files like 'Grandchampion.png'
-    return rankName.replace(/\s/g, ''); 
+function getRankFileName(rankName) {
+    if (!rankName) return 'unranked'; // Default filename
+    // 1. Remove all spaces
+    // 2. Convert to lowercase to match the new file names
+    return rankName.replace(/\s/g, '').toLowerCase(); 
 }
 
 async function register(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t){document.getElementById("auth-status").innerText="Enter email & password";return}const n=prompt("Enter Student Name:");if(!n)return;document.getElementById("auth-status").innerText="Enrolling...";try{const a=await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:n,email:e,password:t})}),s=await a.json();s.success?(document.getElementById("auth-status").innerText="Success! Please Login.",document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-green-400"):(document.getElementById("auth-status").innerText="Error: "+s.error,document.getElementById("auth-status").className="mt-4 text-center text-sm font-medium text-red-400")}catch(r){document.getElementById("auth-status").innerText="Connection Error"}}
@@ -65,8 +63,8 @@ async function login(){const e=document.getElementById("login-email").value,t=do
 if (a.success) {
     const userRank = a.user.rank || 'Unranked';
     
-    // NEW STEP: Convert the rank name to match the file name (e.g., "Grand Champion" -> "Grandchampion")
-    const rankFileName = formatRankNameForPath(userRank);
+    // NEW STEP: Convert the rank name to the standardized, lowercase filename (e.g., "Grand Champion" -> "grandchampion")
+    const rankFileName = getRankFileName(userRank); 
     
     // DYNAMICALLY CREATE THE IMAGE SOURCE using the corrected file name
     const rankIconHtml = `<img src="/resources/images/ranks/${rankFileName}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
