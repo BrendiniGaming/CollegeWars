@@ -11,9 +11,8 @@ import { logger } from "./Logger";
 import { MapPlaylist } from "./MapPlaylist";
 // --- REQUIRED IMPORTS FOR DB/AUTH ---
 import { Pool } from "pg"; 
-import bcrypt from "bcryptjs"; 
+import bcrypt from "bcryptjs"; // Re-added for manual password hashing
 import jwt from "jsonwebtoken";
-// ------------------------------------
 
 const config = getServerConfigFromServer();
 
@@ -27,7 +26,7 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-const JWT_SECRET = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890";
+const JWT_SECRET: string = process.env.JWT_SECRET || "A_VERY_LONG_FALLBACK_STRING_98765432101234567890"; // Keep secure secret
 // --------------------------------------------
 
 // --- Rank System Definitions ---
@@ -56,7 +55,7 @@ function getRankTier(xp: number): string {
 
 async function initDB(): Promise<void> {
   try {
-    // FIX: Reverted to Email/Password table structure
+    // 1. Create the base users table (Restored to require Email/Password hash for manual login)
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -71,7 +70,7 @@ async function initDB(): Promise<void> {
       );
     `);
     
-    // ADD RANK COLUMNS (Safe migration block)
+    // 2. ADD RANK COLUMNS (Safe migration block)
     await db.query(`
       DO $$ 
       BEGIN
@@ -366,12 +365,6 @@ app.post("/api/report-game", async (req, res) => {
     res.status(500).send("Internal server error");
   }
 });
-
-app.get("/api/discord/callback", async (req, res) => {
-    // DISCORD LOGIC IS REMOVED IN THIS REVERSION
-    res.status(404).send("Discord sign-in disabled for stability.");
-});
-
 
 app.get("/api/env", async (req, res) => {
   const envConfig = { game_env: process.env.GAME_ENV };
