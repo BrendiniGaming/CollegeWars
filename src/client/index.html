@@ -50,10 +50,15 @@ async function register(){const e=document.getElementById("login-email").value,t
 async function login(){const e=document.getElementById("login-email").value,t=document.getElementById("login-pass").value;if(!e||!t)return;document.getElementById("auth-status").innerText="Verifying...";try{const n=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:t})}),a=await n.json();
 
 if (a.success) {
-    // 1. Display the user stats (Rank, Wins, XP)
-    document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: <span class="text-yellow-400">${a.user.rank || 'Unranked'}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`;
+    // Determine the rank name and default it to 'Unranked' if not set
+    const userRank = a.user.rank || 'Unranked';
+    // DYNAMICALLY CREATE THE IMAGE SOURCE USING THE RANK NAME and .png EXTENSION
+    const rankIconHtml = `<img src="/resources/images/ranks/${userRank}.png" alt="${userRank} Rank" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; display: inline-block;">`;
+
+    // 1. Display the user stats, including the icon
+    document.getElementById("auth-status").innerHTML=`Welcome, <span class="text-blue-300">${a.user.username}</span>!<br>Rank: ${rankIconHtml}<span class="text-yellow-400">${userRank}</span><br>Wins: <span class="text-green-400">${a.user.wins}</span><br>XP: <span class="text-blue-400">${a.user.xp || 0}</span>`;
     
-    // 2. Hide the form elements, KEEPING the main portal box visible
+    // 2. Hide the form elements
     document.getElementById("login-email").parentElement.style.display="none"; 
     document.getElementById("login-pass").parentElement.style.display="none"; 
     document.querySelector('.flex.gap-3.pt-2').style.display="none"; 
