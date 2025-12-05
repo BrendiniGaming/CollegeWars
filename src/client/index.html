@@ -51,8 +51,11 @@ function hideMainMenu() {
  * (e.g., "Grandchampion") to match your asset structure.
  */
 function formatRankNameForPath(rankName) {
-    // 1. Remove all spaces
-    // 2. Ensure the first letter is capitalized (like "Grandchampion")
+    // If the rank name is exactly "Unranked" (which is the filename), return it.
+    if (rankName === 'Unranked') {
+        return 'Unranked'; 
+    }
+    // For other ranks, remove spaces to match files like 'Grandchampion.png'
     return rankName.replace(/\s/g, ''); 
 }
 
@@ -62,7 +65,7 @@ async function login(){const e=document.getElementById("login-email").value,t=do
 if (a.success) {
     const userRank = a.user.rank || 'Unranked';
     
-    // 💡 NEW STEP: Convert the rank name to match the file name (e.g., "Grand Champion" -> "Grandchampion")
+    // NEW STEP: Convert the rank name to match the file name (e.g., "Grand Champion" -> "Grandchampion")
     const rankFileName = formatRankNameForPath(userRank);
     
     // DYNAMICALLY CREATE THE IMAGE SOURCE using the corrected file name
